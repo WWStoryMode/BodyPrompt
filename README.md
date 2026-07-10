@@ -90,7 +90,8 @@ once research log, score, and set.
 
 The five screens in this repo are **mockups of research instruments**, each answering
 "how does this help the search?" — not "what feature is this?" *(These are static pictures
-of the vision; see Status below — nothing runs yet.)*
+of the vision. Screen 01, the Lab Bench, now also exists as a **functional** version on
+stub data — see [Run it](#run-it) and Status below; screens 02–05 stay as mockups.)*
 
 | # | Instrument | What it lets the research do |
 |---|-----------|------------------------------|
@@ -151,43 +152,83 @@ in front of an audience:
 
 ## Roadmap (framed by research, not features)
 
-| Version | Research milestone |
-|---------|--------------------|
-| **v0** | Research proposition + mock interfaces *(this repo)* |
-| **v1** | Single-model prompting — the search loop running for real |
-| **v2** | Prompt lineage — the branching search retained and navigable |
-| **v3** | Multi-model comparison — how models diverge on one theme |
-| **v4** | Public lecture performance — the search performed live |
-| **v5** | Open research platform — others can search too |
+| Version | Research milestone | State |
+|---------|--------------------|-------|
+| **v0** | Research proposition + mock interfaces | ✓ done |
+| **v0.5** | First functional slice — the Lab Bench moves on **stub** data (schema + renderer + service, no ML) | ◐ in repo now |
+| **v1** | Single-model prompting — the search loop running for real (a model behind the service) | next |
+| **v2** | Prompt lineage — the branching search retained and navigable | |
+| **v3** | Multi-model comparison — how models diverge on one theme | |
+| **v4** | Public lecture performance — the search performed live | |
+| **v5** | Open research platform — others can search too | |
+
+The bridge from v0 to v1 is deliberately split: **v0.5 makes the pipeline real without any
+ML** (prompt → service → canonical motion → animated stick figure), so v1 only has to swap
+the stub for a model.
 
 ---
 
-## The architecture that supports the research (not built yet)
+## The architecture that supports the research
 
-The mockups are drawn against a real architecture so nothing here boxes it out. It is an
-*adapter pattern* — **model → adapter → canonical skeleton → notation renderer** — chosen
-so that the research, not any one model, stays at the centre:
+An *adapter pattern* — **model → adapter → canonical skeleton → notation renderer** — chosen
+so that the research, not any one model, stays at the centre. The v0.5 slice builds the
+spine of it (everything except the models):
 
-- **Canonical motion schema** — a reduced ~22-joint SMPL-family skeleton (positions +
+- ✓ **Canonical motion schema** — a reduced 22-joint SMPL-family skeleton (positions +
   rotations per frame). Every model *down-maps* into it, so each model is a reduction, not
   a re-invention — which is what makes cross-model comparison (screen 03) meaningful.
-- **Stick-figure renderer** (three.js) — plays a canonical motion; replaces the static SVG
-  figures in these mockups.
-- **Per-model adapters** — SnapMoGen, Language of Motion, Kimodo → canonical.
-- **Inference service** (FastAPI) — `POST /generate {model, prompt} → canonical motion`,
-  a fixture stub first so the search loop is real before any weights load.
+  → [`docs/motion-schema.md`](docs/motion-schema.md), [`fixtures/`](fixtures/).
+- ✓ **Stick-figure renderer** (three.js) — plays a canonical motion as notation (joints,
+  bones, trails, orbit camera). → [`frontend/app/`](frontend/app/).
+- ◐ **Inference service** (FastAPI) — `POST /generate {model, prompt} → canonical motion`.
+  Live as a **fixture stub** (no ML) so the search loop is real before any weights load.
+  → [`service/`](service/).
+- ✗ **Per-model adapters** — SnapMoGen, Language of Motion, Kimodo → canonical. *Not built.*
+- ✗ **A model behind the service** — the v1 step; needs weights + likely a GPU. *Not built.*
 
-**Intended stack:** React + TypeScript + Vite + three.js (frontend); Python + FastAPI
-(service); the canonical motion JSON as the exchange format.
+```
+fixtures/            canonical motion JSON (hand-authored) + generator
+docs/motion-schema.md  the exchange-format spec
+service/             FastAPI /generate stub (uv)
+frontend/app/        Vite + three.js Lab Bench (the live screen)
+frontend/mockups/    the original static mockups (reference)
+```
+
+**Stack:** three.js + TypeScript + Vite (frontend, pnpm); Python + FastAPI (service, uv);
+the canonical motion JSON as the exchange format. React is deliberately deferred.
 
 ---
+
+## Run it
+
+Two processes: the service (serves motions) and the app (renders them). Needs
+**Python 3.10+ with [uv](https://docs.astral.sh/uv/)** and **Node 18+ with
+[pnpm](https://pnpm.io/)**.
+
+```bash
+# 1) service — http://localhost:8000
+cd service
+uv run uvicorn app.main:app --port 8000
+
+# 2) app — http://localhost:5173  (in a second terminal)
+cd frontend/app
+pnpm install
+pnpm dev
+```
+
+Open <http://localhost:5173>, type a phrase, click **Generate** — a 3D stick figure
+animates; drag to orbit, use play/pause and the scrub bar. To re-author the motions, edit
+and re-run `python3 fixtures/_generate.py`.
+
+The original static mockups need no build — just `open frontend/mockups/index.html`.
 
 ## Status
 
-**v0 — static interface mockups; nothing runs yet (no ML, no renderer, no backend).**
-The screens are hand-built HTML + inline SVG; the "controls" are styled but inert. The
-research reframing above describes the *method* and the *intended* system — it does not
-mean the software works yet. Repo: **Public**.
+**v0.5 — the Lab Bench runs on hand-authored fixture data over the real API contract. No
+ML, no model weights, no GPU.** The pipeline is genuinely wired end to end (prompt →
+FastAPI → canonical motion → animated three.js stick figure), but the motion is a
+**placeholder fixture chosen by the stub, not generated by any model** — so it does not yet
+"understand" the prompt. Screens 02–05 remain static mockups. Repo: **Public**.
 
 ## Licence
 

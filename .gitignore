@@ -5,12 +5,13 @@
 .vscode/
 .idea/
 
-# node (for when the real frontend lands)
+# node / vite (frontend/app)
 node_modules/
 dist/
+.vite/
 *.log
 
-# python (for when the real service lands)
+# python (service/)
 __pycache__/
 *.pyc
 .venv/
