@@ -1,0 +1,161 @@
+/* Lab Bench app styling — a compact echo of frontend/mockups/styles.css so the
+   functional screen matches the mockups' dark "instrument + stage" look. */
+
+:root {
+  --stage: #0b0c10;
+  --stage-2: #101218;
+  --panel: #161923;
+  --ink: #ece9e2;
+  --ink-dim: #9aa0ac;
+  --ink-faint: #5b616e;
+  --accent: #e9b872;
+  --line: #232732;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--stage);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ---- top bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--stage-2);
+}
+.brand { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.brand b { color: var(--accent); }
+.tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.08em;
+}
+.spacer { flex: 1; }
+.mode-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+/* ---- prompt bar ---- */
+.promptbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.prompt-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 15px;
+  font-style: italic;
+  padding: 11px 14px;
+  outline: none;
+}
+.prompt-input:focus { border-color: var(--accent); }
+.model-select {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 10px 12px;
+}
+.btn {
+  background: var(--accent);
+  color: #14140f;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 18px;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- stage ---- */
+.body { flex: 1; display: flex; min-height: 0; }
+.stage-view { flex: 1; position: relative; min-height: 0; }
+.stage-view canvas { display: block; }
+
+.telemetry {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.telemetry .k { color: var(--ink-dim); }
+.telemetry .stub { color: var(--accent); }
+
+.hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-faint);
+}
+.hint.hidden { display: none; }
+.hint code { color: var(--ink-dim); }
+
+/* ---- transport ---- */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--stage-2);
+}
+.transport button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  padding: 7px 14px;
+  cursor: pointer;
+  min-width: 78px;
+}
+.scrub { flex: 1; accent-color: var(--accent); }
+.counter {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  min-width: 128px;
+  text-align: right;
+}

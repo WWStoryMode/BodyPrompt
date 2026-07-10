@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BodyPrompt · Lab bench (live)</title>
+  </head>
+  <body>
+    <!-- The Lab Bench, functional. Type a phrase -> the service returns a canonical
+         motion -> the three.js renderer plays it. Motion is hand-authored fixture
+         data (stub), not AI output. -->
+    <div id="app">
+      <div class="topbar">
+        <span class="brand"><b>Body</b>Prompt</span>
+        <span class="tag">prompting as choreographic search</span>
+        <span class="spacer"></span>
+        <span class="mode-pill">Lab bench · live</span>
+      </div>
+
+      <div class="promptbar">
+        <input
+          id="prompt"
+          class="prompt-input"
+          value="a body remembers a place it cannot return to"
+          spellcheck="false"
+        />
+        <select id="model" class="model-select">
+          <option value="snapmogen">SnapMoGen</option>
+          <option value="language-of-motion">Language of Motion</option>
+          <option value="kimodo">Kimodo</option>
+        </select>
+        <button id="generate" class="btn">Generate</button>
+      </div>
+
+      <div class="body">
+        <div id="stage" class="stage-view">
+          <div id="telemetry" class="telemetry"></div>
+          <div id="hint" class="hint">
+            Start the service, then click <b>Generate</b>.<br />
+            <code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="playpause">Play</button>
+        <input id="scrub" class="scrub" type="range" min="0" max="1000" value="0" />
+        <span id="counter" class="counter">— / —</span>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
