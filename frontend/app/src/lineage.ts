@@ -74,6 +74,7 @@ const COL_W = 54; // horizontal gap between leaf columns
 const PAD_X = 26;
 const PAD_Y = 26;
 const LABEL_MAX = 18;
+const LABEL_ALLOWANCE = 150; // px reserved to the right of a node for its text label
 
 interface Placed {
   node: LineageNode;
@@ -90,6 +91,7 @@ function layout(lineage: Lineage): { placed: Map<number, Placed>; width: number;
   const placed = new Map<number, Placed>();
   let nextCol = 0;
   let maxDepth = 0;
+  let maxX = 0;
 
   const walk = (node: LineageNode, depth: number): number => {
     maxDepth = Math.max(maxDepth, depth);
@@ -100,17 +102,16 @@ function layout(lineage: Lineage): { placed: Map<number, Placed>; width: number;
       const childXs = node.childIds.map((cid) => walk(lineage.get(cid)!, depth + 1));
       x = childXs.reduce((a, b) => a + b, 0) / childXs.length; // centre over children
     }
-    placed.set(node.id, {
-      node,
-      x: PAD_X + x * COL_W,
-      y: PAD_Y + depth * ROW_H,
-    });
+    const px = PAD_X + x * COL_W;
+    maxX = Math.max(maxX, px);
+    placed.set(node.id, { node, x: px, y: PAD_Y + depth * ROW_H });
     return x;
   };
 
   for (const root of lineage.roots) walk(root, 0);
 
-  const width = PAD_X * 2 + Math.max(0, nextCol - 1) * COL_W + 40;
+  // Width must leave room for the widest node's text label, or the SVG clips it.
+  const width = maxX + LABEL_ALLOWANCE;
   const height = PAD_Y * 2 + maxDepth * ROW_H + 20;
   return { placed, width, height };
 }
