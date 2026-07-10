@@ -1,34 +1,29 @@
 """
-BodyPrompt inference service — v0 STUB.
+BodyPrompt inference service.
 
-This is the real API contract the frontend talks to:
+Exposes the real API contract the frontend talks to:
 
     POST /generate  { "model": str, "prompt": str }  ->  canonical motion (bodyprompt.motion/v0)
 
-...but there is NO ML behind it yet. It simply returns one of the hand-authored
-fixtures in ../../fixtures/, chosen by a stable hash of the prompt so the same prompt
-always yields the same motion and different prompts feel different. This lets the whole
-pipeline (prompt -> service -> canonical motion -> animated stick figure) be real before
-a model is wired in at v1. See docs/motion-schema.md.
+The thing that *produces* the motion is a pluggable backend (see generators.py), chosen by
+the BODYPROMPT_BACKEND env var. Today the default is the no-ML "stub" (hand-authored
+fixtures); cloud and local-GPU backends slot in behind the same contract later. See
+docs/motion-schema.md.
 """
-
-import json
-import pathlib
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# fixtures/ lives at the repo root: service/app/main.py -> ../../fixtures
-FIXTURES_DIR = pathlib.Path(__file__).resolve().parents[2] / "fixtures"
+from .generators import make_generator
 
 app = FastAPI(
-    title="BodyPrompt service (v0 stub)",
-    description="Serves hand-authored canonical-motion fixtures. No ML yet.",
-    version="0.0.1",
+    title="BodyPrompt service",
+    description="Turns prompts into canonical motion via a pluggable backend.",
+    version="0.0.2",
 )
 
-# The Vite dev server (frontend/app) runs on localhost:5173 and calls us from the browser.
+# The Vite dev server (frontend/app) runs on 5173 and calls us from the browser.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -39,18 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-def _load_fixtures() -> list[dict]:
-    """Read every *.json fixture (skip the _generate.py helper). Sorted for stable order."""
-    motions = []
-    for path in sorted(FIXTURES_DIR.glob("*.json")):
-        with open(path) as fh:
-            motions.append(json.load(fh))
-    return motions
-
-
-# Load once at startup — the fixtures are static.
-FIXTURES = _load_fixtures()
+# Build the selected backend once at startup.
+GENERATOR = make_generator()
 
 
 class GenerateRequest(BaseModel):
@@ -60,27 +45,18 @@ class GenerateRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "fixtures": len(FIXTURES), "ml": False}
+    return {
+        "ok": True,
+        "backend": GENERATOR.name,
+        "ml": GENERATOR.ml,
+        "ready": GENERATOR.ready(),
+    }
 
 
 @app.post("/generate")
 def generate(req: GenerateRequest) -> dict:
-    """
-    Return a canonical motion for the prompt.
-
-    STUB behaviour: pick a fixture by a stable hash of the prompt, then echo the caller's
-    prompt/model back onto it so the client sees what it asked for. No model runs.
-    """
-    if not FIXTURES:
-        # No fixtures on disk — surface it clearly rather than 500 with a KeyError later.
-        return {"error": "no fixtures found; run `python3 fixtures/_generate.py`"}
-
-    # Deterministic pick: same prompt -> same motion; different prompts spread across fixtures.
-    idx = (sum(ord(c) for c in req.prompt) if req.prompt else 0) % len(FIXTURES)
-    motion = dict(FIXTURES[idx])  # shallow copy so we don't mutate the cached fixture
-
-    # Echo back what the caller asked for (the fixture's own prompt/model are placeholders).
-    motion["prompt"] = req.prompt or motion.get("prompt", "")
-    motion["model"] = req.model or motion.get("model", "")
-    motion["stub"] = True  # be honest: this did not come from a model
-    return motion
+    """Delegate to the active backend; surface backend errors as a clear message."""
+    try:
+        return GENERATOR.generate(req.model, req.prompt)
+    except RuntimeError as err:
+        return {"error": str(err)}
