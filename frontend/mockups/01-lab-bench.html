@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BodyPrompt · Lab bench</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================================================================
+       SCREEN 01 — LAB BENCH (the core loop / MVP)
+       Type a poetic phrase → a line-figure moves. Fading trails on the
+       hands & feet turn each pose into a Marey-style chronophotograph.
+       (Static mockup: controls are styled but inert.)
+       =================================================================== -->
+  <div class="frame">
+
+    <!-- top bar: identity + current mode -->
+    <div class="topbar">
+      <div class="brand">
+        <span class="mark"><b>Body</b>Prompt</span>
+        <span class="tag">prompting as choreographic search</span>
+      </div>
+      <div class="spacer"></div>
+      <a class="chip" href="index.html">↩ all screens</a>
+      <span class="mode-pill">Lab bench</span>
+    </div>
+
+    <!-- prompt bar: the poetic phrase + model + generate -->
+    <div class="promptbar">
+      <div class="prompt-input">
+        <span class="phrase">a body remembers a place it cannot return to</span>
+        <span class="caret"></span>
+      </div>
+      <div class="model-select"><span class="dot"></span>SnapMoGen ▾</div>
+      <button class="btn">Generate</button>
+    </div>
+
+    <!-- the stage -->
+    <div class="body">
+      <div class="stage-view">
+        <div class="telemetry">
+          <div><b>model</b>&nbsp; snapmogen</div>
+          <div><b>frame</b>&nbsp; 076 / 180</div>
+          <div><b>fps</b>&nbsp;&nbsp;&nbsp; 30</div>
+          <div><b>seed</b>&nbsp;&nbsp; 4412</div>
+        </div>
+
+        <svg viewBox="0 0 720 560" width="640" role="img"
+             aria-label="Stick figure mid-gesture with motion trails on a perspective floor grid">
+          <!-- floor grid, clipped to a trapezoid so it reads as receding ground -->
+          <defs>
+            <clipPath id="floor01">
+              <polygon points="250,430 470,430 720,548 0,548" />
+            </clipPath>
+          </defs>
+          <g clip-path="url(#floor01)" stroke="rgba(255,255,255,0.07)" stroke-width="1">
+            <!-- rails converging toward a vanishing point at (360,362) -->
+            <line x1="360" y1="362" x2="-60" y2="548" />
+            <line x1="360" y1="362" x2="90"  y2="548" />
+            <line x1="360" y1="362" x2="210" y2="548" />
+            <line x1="360" y1="362" x2="300" y2="548" />
+            <line x1="360" y1="362" x2="360" y2="548" />
+            <line x1="360" y1="362" x2="420" y2="548" />
+            <line x1="360" y1="362" x2="510" y2="548" />
+            <line x1="360" y1="362" x2="630" y2="548" />
+            <line x1="360" y1="362" x2="780" y2="548" />
+            <!-- depth lines, closer together toward the horizon -->
+            <line x1="0" y1="548" x2="720" y2="548" />
+            <line x1="0" y1="512" x2="720" y2="512" />
+            <line x1="0" y1="484" x2="720" y2="484" />
+            <line x1="0" y1="463" x2="720" y2="463" />
+            <line x1="0" y1="448" x2="720" y2="448" />
+            <line x1="0" y1="437" x2="720" y2="437" />
+            <line x1="0" y1="430" x2="720" y2="430" />
+          </g>
+
+          <!-- soft contact shadow under the feet -->
+          <ellipse cx="360" cy="482" rx="78" ry="12" fill="rgba(0,0,0,0.45)" />
+
+          <!-- ---- motion trails (chronophotograph ghosts) ---- -->
+          <!-- right hand, sweeping up -->
+          <g style="fill:var(--accent)">
+            <circle cx="452" cy="208" r="4.5" opacity="0.42" />
+            <circle cx="432" cy="240" r="4"   opacity="0.30" />
+            <circle cx="410" cy="272" r="3.5" opacity="0.20" />
+            <circle cx="390" cy="300" r="3"   opacity="0.11" />
+          </g>
+          <!-- left hand -->
+          <g style="fill:var(--accent)">
+            <circle cx="316" cy="266" r="4"   opacity="0.34" />
+            <circle cx="330" cy="242" r="3.5" opacity="0.22" />
+            <circle cx="342" cy="220" r="3"   opacity="0.13" />
+          </g>
+          <!-- feet (move less → shorter trails) -->
+          <g style="fill:var(--accent)">
+            <circle cx="388" cy="474" r="3.5" opacity="0.26" />
+            <circle cx="374" cy="470" r="3"   opacity="0.15" />
+            <circle cx="332" cy="474" r="3.5" opacity="0.26" />
+            <circle cx="346" cy="470" r="3"   opacity="0.15" />
+          </g>
+
+          <!-- ---- the 22-joint stick figure (5 limb-chain polylines) ---- -->
+          <g class="figure">
+            <!-- spine: pelvis→spine1→spine2→chest→neck→head -->
+            <polyline class="fig-bone" points="360,322 360,296 360,262 360,226 360,186 360,150" />
+            <!-- left leg -->
+            <polyline class="fig-bone" points="360,322 338,326 332,396 328,462 318,478" />
+            <!-- right leg -->
+            <polyline class="fig-bone" points="360,322 382,326 388,400 392,466 402,480" />
+            <!-- left arm (chest→collar→shoulder→elbow→wrist) -->
+            <polyline class="fig-bone" points="360,226 344,194 326,196 308,244 300,292" />
+            <!-- right arm, reaching up -->
+            <polyline class="fig-bone" points="360,226 376,194 394,196 430,224 470,178" />
+
+            <!-- joints -->
+            <g>
+              <circle class="fig-joint" cx="360" cy="186" r="4" />
+              <circle class="fig-joint" cx="360" cy="226" r="4" />
+              <circle class="fig-joint" cx="360" cy="262" r="4" />
+              <circle class="fig-joint" cx="360" cy="296" r="4" />
+              <circle class="fig-joint" cx="360" cy="322" r="4.5" />
+              <circle class="fig-joint" cx="338" cy="326" r="4" />
+              <circle class="fig-joint" cx="382" cy="326" r="4" />
+              <circle class="fig-joint" cx="332" cy="396" r="4" />
+              <circle class="fig-joint" cx="388" cy="400" r="4" />
+              <circle class="fig-joint" cx="328" cy="462" r="4" />
+              <circle class="fig-joint" cx="392" cy="466" r="4" />
+              <circle class="fig-joint" cx="344" cy="194" r="3.5" />
+              <circle class="fig-joint" cx="376" cy="194" r="3.5" />
+              <circle class="fig-joint" cx="326" cy="196" r="4" />
+              <circle class="fig-joint" cx="394" cy="196" r="4" />
+              <circle class="fig-joint" cx="308" cy="244" r="4" />
+              <circle class="fig-joint" cx="430" cy="224" r="4" />
+            </g>
+            <!-- landmark joints (head, hands, feet) -->
+            <g class="fig-landmark">
+              <circle cx="360" cy="150" r="10" />
+              <circle cx="300" cy="292" r="5.5" />
+              <circle cx="470" cy="178" r="5.5" />
+              <circle cx="318" cy="478" r="5" />
+              <circle cx="402" cy="480" r="5" />
+            </g>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- transport -->
+    <div class="transport">
+      <div class="tp-btn">■</div>
+      <div class="tp-btn primary">❚❚</div>
+      <div class="scrub">
+        <div class="track"><div class="fill"></div><div class="head"></div></div>
+        <div class="ticks"><span>00:00</span><span>00:02.5</span><span>00:06.0</span></div>
+      </div>
+      <div class="toggle"><span class="sw"></span> trails</div>
+      <div class="toggle"><span class="sw off"></span> loop</div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>01 · Lab bench.</b> The core loop: type a poetic phrase, pick a model, generate —
+    a reduced line-figure performs the machine's reading of the words. Fading trails on
+    the hands and feet turn each pose into a Marey-style chronophotograph, so the
+    <b>movement becomes its own notation</b>.
+  </p>
+</body>
+</html>

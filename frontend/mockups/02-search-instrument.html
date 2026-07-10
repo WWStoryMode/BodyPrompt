@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BodyPrompt · Search instrument</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================================================================
+       SCREEN 02 — SEARCH INSTRUMENT (the research bench / hero image)
+       Prompting as choreographic search: a prompt-lineage TREE on the left
+       (each text edit spawns a child), a variance GHOST-CLOUD in the centre
+       (one prompt, many seeds — the model's uncertainty made visible), and
+       a NOTATION STRIP + FLOOR PATH on the right.
+       =================================================================== -->
+  <div class="frame">
+
+    <div class="topbar">
+      <div class="brand">
+        <span class="mark"><b>Body</b>Prompt</span>
+        <span class="tag">prompting as choreographic search</span>
+      </div>
+      <div class="spacer"></div>
+      <a class="chip" href="index.html">↩ all screens</a>
+      <span class="mode-pill">Search instrument</span>
+    </div>
+
+    <div class="promptbar">
+      <div class="prompt-input">
+        <span class="phrase">home</span>
+        <span class="caret"></span>
+        <span class="faint mono" style="margin-left:8px;font-size:11px;">· editing node #3</span>
+      </div>
+      <div class="model-select"><span class="dot"></span>SnapMoGen ▾</div>
+      <button class="btn">Generate variant</button>
+    </div>
+
+    <div class="body">
+
+      <!-- ============ LEFT RAIL — prompt-lineage tree ============ -->
+      <div class="rail">
+        <h3>Prompt lineage</h3>
+        <svg viewBox="0 0 264 560" width="100%" role="img"
+             aria-label="Prompt lineage tree: each text edit spawns a child node">
+          <!-- connectors (drawn first, behind nodes) -->
+          <g stroke="var(--line-strong)" stroke-width="1.5" fill="none">
+            <path d="M124,66 V92" />
+            <path d="M124,138 V164" />
+            <!-- branch from node 3 -->
+            <path d="M110,210 q-40,20 -40,44" />
+            <path d="M138,210 q40,20 40,44" />
+            <!-- child of left branch -->
+            <path d="M70,326 V352" />
+          </g>
+
+          <!-- helper: a node is a rounded rect + tiny pose glyph + label -->
+          <!-- N1 -->
+          <g>
+            <rect x="34" y="24" width="180" height="42" rx="9" fill="var(--panel-2)" stroke="var(--line)"/>
+            <g stroke="var(--ink-dim)" stroke-width="1.6" fill="none" transform="translate(50,45)">
+              <circle cx="0" cy="-9" r="3" fill="var(--ink-dim)" stroke="none"/>
+              <line x1="0" y1="-6" x2="0" y2="4"/><line x1="-5" y1="-2" x2="5" y2="-2"/>
+              <line x1="0" y1="4" x2="-4" y2="12"/><line x1="0" y1="4" x2="4" y2="12"/>
+            </g>
+            <text x="72" y="50" fill="var(--ink-dim)" font-family="var(--mono)" font-size="12.5">walk home</text>
+          </g>
+          <!-- N2 -->
+          <g>
+            <rect x="34" y="96" width="180" height="42" rx="9" fill="var(--panel-2)" stroke="var(--line)"/>
+            <g stroke="var(--ink-dim)" stroke-width="1.6" fill="none" transform="translate(50,117)">
+              <circle cx="0" cy="-9" r="3" fill="var(--ink-dim)" stroke="none"/>
+              <line x1="0" y1="-6" x2="0" y2="4"/><line x1="-5" y1="-3" x2="4" y2="0"/>
+              <line x1="0" y1="4" x2="-4" y2="12"/><line x1="0" y1="4" x2="5" y2="10"/>
+            </g>
+            <text x="72" y="122" fill="var(--ink-dim)" font-family="var(--mono)" font-size="12.5">coming home</text>
+          </g>
+          <!-- N3 — CURRENT (highlighted) -->
+          <g>
+            <rect x="34" y="168" width="180" height="42" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <g stroke="var(--accent)" stroke-width="1.8" fill="none" transform="translate(50,189)">
+              <circle cx="0" cy="-9" r="3" fill="var(--accent)" stroke="none"/>
+              <line x1="0" y1="-6" x2="0" y2="4"/><line x1="-5" y1="-1" x2="5" y2="-3"/>
+              <line x1="0" y1="4" x2="-3" y2="12"/><line x1="0" y1="4" x2="4" y2="11"/>
+            </g>
+            <text x="72" y="194" fill="var(--ink)" font-family="var(--mono)" font-size="12.5" font-weight="600">home</text>
+          </g>
+          <!-- N4 — child (abstract branch) -->
+          <g>
+            <rect x="0" y="254" width="140" height="42" rx="9" fill="var(--panel-2)" stroke="var(--line)"/>
+            <g stroke="var(--ink-dim)" stroke-width="1.6" fill="none" transform="translate(16,275)">
+              <circle cx="0" cy="-9" r="3" fill="var(--ink-dim)" stroke="none"/>
+              <line x1="0" y1="-6" x2="0" y2="4"/><line x1="-5" y1="-4" x2="4" y2="-6"/>
+              <line x1="0" y1="4" x2="-5" y2="10"/><line x1="0" y1="4" x2="3" y2="12"/>
+            </g>
+            <text x="34" y="280" fill="var(--ink-dim)" font-family="var(--mono)" font-size="11">the idea of home</text>
+          </g>
+          <!-- N5 — child (other branch) -->
+          <g>
+            <rect x="150" y="254" width="114" height="42" rx="9" fill="var(--panel-2)" stroke="var(--line)"/>
+            <text x="166" y="272" fill="var(--ink-dim)" font-family="var(--mono)" font-size="11">home,</text>
+            <text x="166" y="286" fill="var(--ink-dim)" font-family="var(--mono)" font-size="11">dissolving</text>
+          </g>
+          <!-- N6 — grandchild -->
+          <g>
+            <rect x="0" y="352" width="140" height="42" rx="9" fill="var(--panel-2)" stroke="var(--line)"/>
+            <text x="16" y="378" fill="var(--ink-faint)" font-family="var(--mono)" font-size="11">a place, unreachable</text>
+          </g>
+        </svg>
+        <div class="card" style="margin-top:14px;">
+          <div class="label">Reading</div>
+          <div class="mono dim" style="font-size:11.5px;line-height:1.7;">
+            literal → abstract ladder.<br>each edit = a child. the tree <span style="color:var(--ink)">is</span> the research log.
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ CENTRE — figure + variance ghost-cloud ============ -->
+      <div class="stage-view">
+        <div class="telemetry">
+          <div><b>prompt</b>&nbsp;&nbsp; "home"</div>
+          <div><b>seeds</b>&nbsp;&nbsp;&nbsp;6 takes overlaid</div>
+          <div><b>variance</b> ◍ ghost-cloud on</div>
+        </div>
+
+        <svg viewBox="0 0 640 560" width="560" role="img"
+             aria-label="One figure surrounded by translucent ghost-copies showing seed variance">
+          <ellipse cx="320" cy="470" rx="80" ry="12" fill="rgba(0,0,0,0.4)" />
+
+          <!-- ghost-cloud: several variance takes, cool tint, low opacity -->
+          <g class="fig-ghost" opacity="0.55">
+            <g transform="rotate(-6 320 300)">
+              <polyline class="fig-bone" points="320,314 320,288 320,254 320,218 320,178 320,142"/>
+              <polyline class="fig-bone" points="320,314 300,318 296,388 292,454 282,470"/>
+              <polyline class="fig-bone" points="320,314 342,318 348,392 352,458 362,472"/>
+              <polyline class="fig-bone" points="320,218 304,186 286,190 276,238 292,280"/>
+              <polyline class="fig-bone" points="320,218 336,186 354,190 388,168 420,150"/>
+            </g>
+          </g>
+          <g class="fig-ghost" opacity="0.4">
+            <g transform="rotate(7 320 300) translate(6 0)">
+              <polyline class="fig-bone" points="320,314 320,288 320,254 320,218 320,178 320,142"/>
+              <polyline class="fig-bone" points="320,314 300,318 292,388 300,454 290,470"/>
+              <polyline class="fig-bone" points="320,314 342,318 352,392 348,458 358,472"/>
+              <polyline class="fig-bone" points="320,218 304,186 286,196 300,244 322,278"/>
+              <polyline class="fig-bone" points="320,218 336,186 356,192 368,240 350,286"/>
+            </g>
+          </g>
+          <g class="fig-ghost" opacity="0.3">
+            <g transform="translate(-14 4)">
+              <polyline class="fig-bone" points="320,314 320,288 320,254 320,218 320,178 320,142"/>
+              <polyline class="fig-bone" points="320,314 302,318 298,388 300,454 292,470"/>
+              <polyline class="fig-bone" points="320,314 340,318 344,392 346,458 356,472"/>
+              <polyline class="fig-bone" points="320,218 302,188 282,192 262,232 246,272"/>
+              <polyline class="fig-bone" points="320,218 338,188 358,192 378,232 396,272"/>
+            </g>
+          </g>
+
+          <!-- the selected take, solid amber -->
+          <g class="figure">
+            <polyline class="fig-bone" points="320,314 320,288 320,254 320,218 320,178 320,142"/>
+            <polyline class="fig-bone" points="320,314 300,318 296,388 292,454 282,470"/>
+            <polyline class="fig-bone" points="320,314 342,318 348,392 352,458 362,472"/>
+            <polyline class="fig-bone" points="320,218 302,188 284,192 268,238 258,286"/>
+            <polyline class="fig-bone" points="320,218 338,188 356,192 392,170 424,150"/>
+            <g>
+              <circle class="fig-joint" cx="320" cy="178" r="4"/>
+              <circle class="fig-joint" cx="320" cy="218" r="4"/>
+              <circle class="fig-joint" cx="320" cy="254" r="4"/>
+              <circle class="fig-joint" cx="320" cy="288" r="4"/>
+              <circle class="fig-joint" cx="320" cy="314" r="4.5"/>
+              <circle class="fig-joint" cx="300" cy="318" r="4"/>
+              <circle class="fig-joint" cx="342" cy="318" r="4"/>
+              <circle class="fig-joint" cx="296" cy="388" r="4"/>
+              <circle class="fig-joint" cx="348" cy="392" r="4"/>
+              <circle class="fig-joint" cx="292" cy="454" r="4"/>
+              <circle class="fig-joint" cx="352" cy="458" r="4"/>
+              <circle class="fig-joint" cx="284" cy="192" r="4"/>
+              <circle class="fig-joint" cx="356" cy="192" r="4"/>
+              <circle class="fig-joint" cx="268" cy="238" r="4"/>
+              <circle class="fig-joint" cx="392" cy="170" r="4"/>
+            </g>
+            <g class="fig-landmark">
+              <circle cx="320" cy="142" r="10"/>
+              <circle cx="258" cy="286" r="5.5"/>
+              <circle cx="424" cy="150" r="5.5"/>
+              <circle cx="282" cy="470" r="5"/>
+              <circle cx="362" cy="472" r="5"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <!-- ============ RIGHT RAIL — notation strip + floor path ============ -->
+      <div class="rail right">
+        <h3>Notation strip</h3>
+        <div class="card">
+          <svg viewBox="0 0 264 176" width="100%" role="img"
+               aria-label="Per-limb notation tracks with direction and level glyphs over time">
+            <!-- five limb tracks; each a baseline with glyphs along time -->
+            <g font-family="var(--mono)" font-size="9" fill="var(--ink-faint)">
+              <text x="0" y="20">L·arm</text><text x="0" y="52">R·arm</text>
+              <text x="0" y="84">spine</text><text x="0" y="116">L·leg</text>
+              <text x="0" y="148">R·leg</text>
+            </g>
+            <g stroke="var(--line)" stroke-width="1">
+              <line x1="40" y1="16" x2="264" y2="16"/>
+              <line x1="40" y1="48" x2="264" y2="48"/>
+              <line x1="40" y1="80" x2="264" y2="80"/>
+              <line x1="40" y1="112" x2="264" y2="112"/>
+              <line x1="40" y1="144" x2="264" y2="144"/>
+            </g>
+            <!-- glyphs: little level/direction marks in accent -->
+            <g stroke="var(--accent)" stroke-width="1.8" fill="none">
+              <path d="M56,16 l6,-9 l6,9"/>  <path d="M96,16 l10,0"/> <path d="M150,7 v9"/> <path d="M196,16 l7,-8"/>
+              <path d="M56,48 l0,-9"/> <path d="M100,40 l8,8"/> <path d="M156,48 l8,-8"/> <path d="M210,48 l7,0"/>
+              <path d="M64,72 q10,8 20,0"/> <path d="M130,80 l0,-8"/> <path d="M190,72 q10,8 20,0"/>
+              <path d="M60,112 l6,8"/> <path d="M112,104 l0,8"/> <path d="M170,112 l7,-7"/> <path d="M220,112 l0,-8"/>
+              <path d="M60,144 l6,-8"/> <path d="M118,136 l0,8"/> <path d="M176,144 l7,7"/> <path d="M224,136 l0,8"/>
+            </g>
+            <!-- playhead -->
+            <line x1="150" y1="4" x2="150" y2="156" stroke="var(--accent)" stroke-width="1" opacity="0.5" stroke-dasharray="2 3"/>
+          </svg>
+          <div class="faint mono" style="font-size:10px;margin-top:6px;">legible enough to re-perform from</div>
+        </div>
+
+        <h3 style="margin-top:18px;">Floor path</h3>
+        <div class="card">
+          <svg viewBox="0 0 264 150" width="100%" role="img"
+               aria-label="Top-down trace of where the body travels across the floor">
+            <rect x="1" y="1" width="262" height="148" rx="6" fill="none" stroke="var(--line)"/>
+            <!-- floor grid (top-down) -->
+            <g stroke="var(--line)" stroke-width="1" opacity="0.5">
+              <line x1="66" y1="1" x2="66" y2="149"/><line x1="132" y1="1" x2="132" y2="149"/><line x1="198" y1="1" x2="198" y2="149"/>
+              <line x1="1" y1="50" x2="263" y2="50"/><line x1="1" y1="99" x2="263" y2="99"/>
+            </g>
+            <!-- travelled path -->
+            <path d="M40,120 C80,70 120,130 160,80 S220,40 224,44"
+                  fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+            <!-- footfall marks -->
+            <g fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1">
+              <circle cx="40" cy="120" r="3"/><circle cx="112" cy="104" r="3"/><circle cx="176" cy="70" r="3"/>
+            </g>
+            <!-- current position -->
+            <circle cx="224" cy="44" r="5" fill="var(--accent)"/>
+          </svg>
+          <div class="faint mono" style="font-size:10px;margin-top:6px;">maps onto Kimodo's 2D path constraints</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <div class="tp-btn">■</div>
+      <div class="tp-btn primary">❚❚</div>
+      <div class="scrub">
+        <div class="track"><div class="fill"></div><div class="head"></div></div>
+        <div class="ticks"><span>00:00</span><span>take 4 / 6</span><span>00:06.0</span></div>
+      </div>
+      <div class="toggle"><span class="sw"></span> ghost-cloud</div>
+      <div class="toggle"><span class="sw"></span> notation</div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>02 · Search instrument.</b> The research bench. Every text edit spawns a
+    <b>child in the lineage tree</b> (left) — the searching, misunderstanding and
+    re-editing <i>is</i> the work. The centre overlays many seeds as a translucent
+    <b>ghost-cloud</b> — the model's uncertainty made visible (memory is plural). The
+    <b>notation strip</b> and <b>floor path</b> (right) reduce the motion to something
+    legible enough to re-perform.
+  </p>
+</body>
+</html>

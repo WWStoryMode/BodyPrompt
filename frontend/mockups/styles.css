@@ -1,0 +1,330 @@
+/* =========================================================================
+   BodyPrompt — shared mockup design system
+   -------------------------------------------------------------------------
+   These are STATIC, non-functional interface mockups for an abstract
+   submission. No JavaScript: controls look real but are inert. Every screen
+   imports this one file so the whole set reads as a single product.
+
+   Aesthetic: dark, projectable "instrument + stage" —
+     near-black stage · warm off-white text · one warm "bone/amber" accent ·
+     a cool "ghost" tint for variance/uncertainty · monospace telemetry labels.
+   ========================================================================= */
+
+:root {
+  /* --- palette ------------------------------------------------------- */
+  --stage:        #0b0c10;   /* outermost background (behind the frame)   */
+  --stage-2:      #101218;   /* the screen frame                          */
+  --panel:        #161923;   /* raised panels / side rails                */
+  --panel-2:      #1c2029;   /* inputs, chips                             */
+  --line:         rgba(255, 255, 255, 0.09);  /* hairline borders         */
+  --line-strong:  rgba(255, 255, 255, 0.16);
+
+  --ink:          #ece9e2;   /* primary text (warm off-white / "bone")    */
+  --ink-dim:      #a7abb8;   /* secondary text                            */
+  --ink-faint:    #6c7180;   /* tertiary / telemetry                      */
+
+  --accent:       #e9b872;   /* warm amber — the figure & primary accent  */
+  --accent-soft:  rgba(233, 184, 114, 0.16);
+  --ghost:        #74a7c8;   /* cool tint — variance / ghost-cloud        */
+  --ghost-soft:   rgba(116, 167, 200, 0.14);
+
+  /* --- type ---------------------------------------------------------- */
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* --- geometry ------------------------------------------------------ */
+  --frame-w: 1440px;
+  --frame-h: 900px;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #14161d 0%, var(--stage) 60%);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* =========================================================================
+   Device frame — each screen is a fixed 1440×900 stage, centered, so
+   screenshots come out consistent and intentional.
+   ========================================================================= */
+.frame {
+  width: var(--frame-w);
+  min-height: var(--frame-h);
+  margin: 32px auto;
+  background: var(--stage-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================================================================
+   Top bar — product identity + current mode/phase, on every screen.
+   ========================================================================= */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand .mark {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-size: 16px;
+}
+.brand .mark b { color: var(--accent); font-weight: 700; }
+.brand .tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+.topbar .spacer { flex: 1; }
+
+/* small pill that names the current screen/mode */
+.mode-pill {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid rgba(233, 184, 114, 0.3);
+  padding: 5px 11px;
+  border-radius: 999px;
+}
+
+/* generic nav chips (e.g. links back to the contact sheet) */
+.chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  padding: 5px 10px;
+  border-radius: 7px;
+}
+.chip:hover { border-color: var(--line-strong); }
+
+/* =========================================================================
+   Prompt bar — the poetic phrase input + model selector + generate button.
+   ========================================================================= */
+.promptbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.prompt-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 11px 14px;
+}
+.prompt-input .caret {
+  width: 2px; height: 18px; background: var(--accent);
+  opacity: 0.9;
+}
+.prompt-input .phrase {
+  font-size: 17px;
+  font-style: italic;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+.prompt-input .placeholder { color: var(--ink-faint); font-style: italic; }
+
+.model-select {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 12px; color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 13px;
+}
+.model-select .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+.btn {
+  font-family: var(--sans);
+  font-size: 13px; font-weight: 600;
+  color: #221a0c;
+  background: var(--accent);
+  border: none;
+  border-radius: 9px;
+  padding: 11px 20px;
+  letter-spacing: 0.02em;
+}
+.btn.ghost {
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+/* =========================================================================
+   Layout helpers — stage viewport + side rails.
+   ========================================================================= */
+.body { flex: 1; display: flex; min-height: 0; }
+.rail {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  padding: 18px;
+  overflow: hidden;
+}
+.rail.right { border-right: none; border-left: 1px solid var(--line); }
+.rail h3 {
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+
+.stage-view {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(700px 500px at 50% 35%, rgba(255,255,255,0.03), transparent 70%),
+    var(--stage-2);
+  overflow: hidden;
+}
+
+/* floating telemetry read-out (frame count, seed, etc.) */
+.telemetry {
+  position: absolute;
+  top: 16px; left: 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.7;
+}
+.telemetry b { color: var(--ink-dim); font-weight: 500; }
+
+/* =========================================================================
+   Transport — play/pause, scrub timeline, toggles.
+   ========================================================================= */
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+.tp-btn {
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.tp-btn.primary { background: var(--accent); color: #221a0c; border-color: transparent; }
+
+.scrub { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.scrub .track {
+  position: relative;
+  height: 6px;
+  background: var(--panel-2);
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+.scrub .fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 42%;
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent));
+  border-radius: 999px;
+}
+.scrub .head {
+  position: absolute; top: 50%; left: 42%;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 4px rgba(233,184,114,0.18);
+}
+.scrub .ticks {
+  display: flex; justify-content: space-between;
+  font-family: var(--mono); font-size: 10px; color: var(--ink-faint);
+}
+
+.toggle {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+}
+.toggle .sw {
+  width: 34px; height: 19px; border-radius: 999px;
+  background: var(--accent); position: relative;
+  border: 1px solid transparent;
+}
+.toggle .sw.off { background: var(--panel-2); border-color: var(--line); }
+.toggle .sw::after {
+  content: ""; position: absolute; top: 2px; right: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #221a0c;
+}
+.toggle .sw.off::after { left: 2px; right: auto; background: var(--ink-faint); }
+
+/* =========================================================================
+   Generic panel card (used in rails, notation views, etc.)
+   ========================================================================= */
+.card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.card .label {
+  font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+.mono { font-family: var(--mono); }
+.dim { color: var(--ink-dim); }
+.faint { color: var(--ink-faint); }
+
+/* =========================================================================
+   Caption strip — a short line under each mock explaining what it shows.
+   Kept out of the way so it can be cropped from a screenshot if wanted.
+   ========================================================================= */
+.caption {
+  max-width: var(--frame-w);
+  margin: 0 auto 40px;
+  padding: 0 8px;
+  color: var(--ink-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.caption b { color: var(--ink); font-weight: 600; }
+
+/* =========================================================================
+   SVG figure defaults — bones as strokes, joints as dots.
+   ========================================================================= */
+.fig-bone { stroke: var(--accent); stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.fig-joint { fill: var(--stage-2); stroke: var(--accent); stroke-width: 2; }
+.fig-landmark { fill: var(--accent); }
+.fig-ghost .fig-bone { stroke: var(--ghost); opacity: 0.5; }
+.fig-ghost .fig-joint { stroke: var(--ghost); }
+.trail { fill: none; stroke: var(--accent); stroke-linecap: round; }

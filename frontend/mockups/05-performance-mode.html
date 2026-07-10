@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BodyPrompt · Performance mode</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* stage-dark, projectable, minimal chrome */
+    .stageframe { background:#07080b; }
+    .perf-body { flex:1; display:flex; min-height:0; }
+    .perf-stage { flex:1.15; position:relative; display:flex; align-items:center; justify-content:center;
+                  background: radial-gradient(520px 620px at 42% 44%, rgba(233,184,114,0.08), transparent 68%), #07080b; }
+    .perf-phrase { position:absolute; bottom:64px; left:0; right:0; text-align:center; }
+    .perf-phrase .big { font-size:30px; font-style:italic; letter-spacing:0.01em; color:var(--ink); }
+    .perf-phrase .meta { margin-top:14px; font-family:var(--mono); font-size:12px; color:var(--ink-faint);
+                         letter-spacing:0.12em; text-transform:uppercase; }
+    .perf-phrase .meta .on { color:var(--accent); }
+    /* growing lineage in a corner */
+    .perf-lineage { position:absolute; top:26px; left:28px; font-family:var(--mono); font-size:11px; color:var(--ink-faint); }
+    .perf-lineage .node { display:flex; align-items:center; gap:8px; padding:3px 0; }
+    .perf-lineage .dot { width:7px; height:7px; border-radius:50%; background:var(--ink-faint); flex-shrink:0; }
+    .perf-lineage .node.cur .dot { background:var(--accent); box-shadow:0 0 0 4px rgba(233,184,114,0.18); }
+    .perf-lineage .node.cur { color:var(--ink); }
+    .perf-lineage .stem { width:1px; height:10px; background:var(--line-strong); margin-left:3px; }
+    .perf-lineage .live { color:var(--accent); }
+    /* the readable score panel */
+    .perf-score { width:440px; flex-shrink:0; border-left:1px solid var(--line); background:#0b0c10;
+                  padding:30px 30px; display:flex; flex-direction:column; }
+    .perf-score .kicker { font-family:var(--mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+                          color:var(--ink-faint); }
+    .perf-score h2 { margin:8px 0 22px; font-size:22px; font-weight:600; letter-spacing:0.01em; }
+    .perf-score .block { margin-bottom:26px; }
+    .perf-score .bl { font-family:var(--mono); font-size:10.5px; letter-spacing:0.1em; text-transform:uppercase;
+                      color:var(--ink-faint); margin-bottom:12px; }
+  </style>
+</head>
+<body>
+  <!-- ===================================================================
+       SCREEN 05 — PERFORMANCE MODE
+       A stripped, projectable UI for the lecture-performance: slow/looped
+       playback, a large READABLE SCORE the performer re-embodies, and the
+       prompt-lineage tree growing live as both research log and set.
+       =================================================================== -->
+  <div class="frame stageframe">
+
+    <div class="topbar" style="border-color:rgba(255,255,255,0.06);">
+      <div class="brand">
+        <span class="mark"><b>Body</b>Prompt</span>
+        <span class="tag">lecture-performance</span>
+      </div>
+      <div class="spacer"></div>
+      <a class="chip" href="index.html">↩ all screens</a>
+      <span class="mode-pill">Performance mode</span>
+    </div>
+
+    <div class="perf-body">
+
+      <!-- ============ STAGE — the performer figure ============ -->
+      <div class="perf-stage">
+
+        <!-- lineage growing live, top corner (research log = set) -->
+        <div class="perf-lineage">
+          <div class="node"><span class="dot"></span>walk home</div>
+          <div class="stem"></div>
+          <div class="node"><span class="dot"></span>coming home</div>
+          <div class="stem"></div>
+          <div class="node cur"><span class="dot"></span>home</div>
+          <div class="stem"></div>
+          <div class="node"><span class="dot" style="background:transparent;border:1px dashed var(--accent);"></span><span class="live">the idea of home ▍</span></div>
+        </div>
+
+        <!-- large performer with slow-mo trails -->
+        <svg viewBox="0 0 520 620" width="520" role="img" aria-label="Large performer stick figure with long slow-motion trails">
+          <ellipse cx="260" cy="540" rx="92" ry="14" fill="rgba(0,0,0,0.5)"/>
+
+          <!-- long slow-motion trails on the reaching hand -->
+          <g style="fill:var(--accent)">
+            <circle cx="330" cy="300" r="6" opacity="0.10"/>
+            <circle cx="352" cy="256" r="6" opacity="0.16"/>
+            <circle cx="372" cy="214" r="6" opacity="0.24"/>
+            <circle cx="386" cy="176" r="6" opacity="0.34"/>
+          </g>
+          <g style="fill:var(--accent)">
+            <circle cx="196" cy="330" r="5" opacity="0.12"/>
+            <circle cx="182" cy="300" r="5" opacity="0.2"/>
+            <circle cx="172" cy="272" r="5" opacity="0.3"/>
+          </g>
+
+          <g class="figure">
+            <polyline class="fig-bone" style="stroke-width:4" points="260,356 260,322 260,282 260,242 260,196 260,158"/>
+            <polyline class="fig-bone" style="stroke-width:4" points="260,356 234,362 226,452 218,528 204,548"/>
+            <polyline class="fig-bone" style="stroke-width:4" points="260,356 286,362 296,454 304,530 318,550"/>
+            <polyline class="fig-bone" style="stroke-width:4" points="260,242 234,210 210,214 178,262 166,308"/>
+            <polyline class="fig-bone" style="stroke-width:4" points="260,242 286,210 310,214 350,196 392,158"/>
+            <g stroke-width="2.4">
+              <circle class="fig-joint" cx="260" cy="196" r="5"/><circle class="fig-joint" cx="260" cy="242" r="5"/>
+              <circle class="fig-joint" cx="260" cy="282" r="5"/><circle class="fig-joint" cx="260" cy="322" r="5"/>
+              <circle class="fig-joint" cx="260" cy="356" r="5.5"/>
+              <circle class="fig-joint" cx="234" cy="362" r="5"/><circle class="fig-joint" cx="286" cy="362" r="5"/>
+              <circle class="fig-joint" cx="226" cy="452" r="5"/><circle class="fig-joint" cx="296" cy="454" r="5"/>
+              <circle class="fig-joint" cx="210" cy="214" r="5"/><circle class="fig-joint" cx="310" cy="214" r="5"/>
+              <circle class="fig-joint" cx="178" cy="262" r="5"/><circle class="fig-joint" cx="350" cy="196" r="5"/>
+            </g>
+            <g class="fig-landmark">
+              <circle cx="260" cy="158" r="13"/>
+              <circle cx="166" cy="308" r="7"/><circle cx="392" cy="158" r="7"/>
+              <circle cx="204" cy="548" r="6.5"/><circle cx="318" cy="550" r="6.5"/>
+            </g>
+          </g>
+        </svg>
+
+        <!-- current phrase + minimal transport -->
+        <div class="perf-phrase">
+          <div class="big">"a body remembers a place it cannot return to"</div>
+          <div class="meta">⟳ loop&nbsp;&nbsp;·&nbsp;&nbsp;<span class="on">0.5× tempo</span>&nbsp;&nbsp;·&nbsp;&nbsp;bar 2 / 4&nbsp;&nbsp;·&nbsp;&nbsp;re-embody</div>
+        </div>
+      </div>
+
+      <!-- ============ THE READABLE SCORE (for the performer) ============ -->
+      <div class="perf-score">
+        <div class="kicker">the score</div>
+        <h2>for the body</h2>
+
+        <!-- big, legible per-limb score -->
+        <div class="block">
+          <div class="bl">phrase · per limb</div>
+          <svg viewBox="0 0 380 190" width="100%" role="img" aria-label="Large legible notation score">
+            <g font-family="var(--mono)" font-size="12" fill="var(--ink-dim)">
+              <text x="0" y="26">arms</text><text x="0" y="74">spine</text>
+              <text x="0" y="122">weight</text><text x="0" y="170">feet</text>
+            </g>
+            <g stroke="var(--line-strong)" stroke-width="1.2">
+              <line x1="58" y1="22" x2="378" y2="22"/><line x1="58" y1="70" x2="378" y2="70"/>
+              <line x1="58" y1="118" x2="378" y2="118"/><line x1="58" y1="166" x2="378" y2="166"/>
+            </g>
+            <g stroke="var(--line)" stroke-width="1" opacity="0.5">
+              <line x1="138" y1="8" x2="138" y2="182"/><line x1="218" y1="8" x2="218" y2="182"/><line x1="298" y1="8" x2="298" y2="182"/>
+            </g>
+            <!-- bold, spaced glyphs — designed to be read at a glance -->
+            <g stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round">
+              <path d="M84,22 l0,-14"/> <path d="M172,22 l14,-10"/> <path d="M256,10 l0,12"/> <path d="M338,22 l0,-14"/>
+              <path d="M96,62 q14,12 28,0"/> <path d="M186,70 l0,-14"/> <path d="M264,58 q14,12 28,0"/>
+              <path d="M84,110 l12,-12"/> <path d="M176,118 l0,-14"/> <path d="M256,106 l14,12"/> <path d="M336,118 l0,-14"/>
+              <path d="M92,158 l12,12"/> <path d="M180,166 l0,-14"/> <path d="M260,158 l12,12"/> <path d="M340,166 l0,-14"/>
+            </g>
+            <line x1="218" y1="4" x2="218" y2="186" stroke="var(--accent)" stroke-width="1.6" opacity="0.6" stroke-dasharray="3 4"/>
+          </svg>
+        </div>
+
+        <!-- floor path to walk -->
+        <div class="block">
+          <div class="bl">floor · path to walk</div>
+          <svg viewBox="0 0 380 130" width="100%" role="img" aria-label="Floor path the performer walks">
+            <rect x="1" y="1" width="378" height="128" rx="8" fill="none" stroke="var(--line)"/>
+            <g stroke="var(--line)" stroke-width="1" opacity="0.45">
+              <line x1="95" y1="1" x2="95" y2="129"/><line x1="190" y1="1" x2="190" y2="129"/><line x1="285" y1="1" x2="285" y2="129"/>
+              <line x1="1" y1="43" x2="379" y2="43"/><line x1="1" y1="86" x2="379" y2="86"/>
+            </g>
+            <path d="M40,104 C100,40 160,110 230,64 S320,34 344,52"
+                  fill="none" stroke="var(--accent)" stroke-width="2.6" stroke-linecap="round"/>
+            <g fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.4">
+              <circle cx="40" cy="104" r="5"/><circle cx="150" cy="80" r="5"/><circle cx="230" cy="64" r="5"/>
+            </g>
+            <circle cx="344" cy="52" r="6.5" fill="var(--accent)"/>
+          </svg>
+        </div>
+
+        <div class="mono faint" style="font-size:11px;line-height:1.7;margin-top:auto;">
+          the finished work is not the AI motion alone, but the visible negotiation
+          between <span class="dim">body · word · machine · score · performer</span>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>05 · Performance mode.</b> A stripped, projectable stage for the lecture-performance:
+    slow, looped playback and a large <b>readable score</b> the artist re-embodies through
+    their own body. The prompt-lineage tree grows <b>live</b> in the corner — both research
+    log and set. The work is the visible negotiation between body, word, machine, score,
+    and performer.
+  </p>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# editors
+.vscode/
+.idea/
+
+# node (for when the real frontend lands)
+node_modules/
+dist/
+*.log
+
+# python (for when the real service lands)
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BodyPrompt · Triptych</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* three equal model panels */
+    .triptych { flex: 1; display: flex; min-height: 0; }
+    .col { flex: 1; display: flex; flex-direction: column; border-right: 1px solid var(--line); min-width: 0; }
+    .col:last-child { border-right: none; }
+    .col-head { padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    .col-head .name { font-weight: 700; font-size: 15px; }
+    .col-head .skel { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); margin-top: 3px; }
+    .mode-tag { display:inline-block; margin-top:9px; font-family: var(--mono); font-size: 10px;
+                letter-spacing:0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+    .mode-write  { color:#e9b872; background: rgba(233,184,114,0.14); border:1px solid rgba(233,184,114,0.3); }
+    .mode-voice  { color:#c78ad0; background: rgba(199,138,208,0.14); border:1px solid rgba(199,138,208,0.32); }
+    .mode-sculpt { color:#74a7c8; background: rgba(116,167,200,0.14); border:1px solid rgba(116,167,200,0.32); }
+    .col-stage { flex:1; display:flex; align-items:center; justify-content:center;
+                 background: radial-gradient(400px 320px at 50% 40%, rgba(255,255,255,0.03), transparent 70%); }
+    .col-input { padding: 14px 16px; border-top: 1px solid var(--line); background: var(--panel); }
+    .col-input .label { font-family: var(--mono); font-size:10px; letter-spacing:0.09em;
+                        text-transform:uppercase; color: var(--ink-faint); margin-bottom: 9px; }
+    .textblock { font-size: 12.5px; font-style: italic; line-height: 1.6; color: var(--ink-dim);
+                 background: var(--panel-2); border:1px solid var(--line); border-radius: 8px; padding: 11px 12px; }
+  </style>
+</head>
+<body>
+  <!-- ===================================================================
+       SCREEN 03 — MULTI-MODEL TRIPTYCH
+       The same prompt, three models — but each keeps its NATIVE input:
+       write (SnapMoGen) vs voice (Language of Motion) vs sculpt (Kimodo).
+       The shared output+render layer with divergent authoring IS the UX
+       comparison, not an inconvenience.
+       =================================================================== -->
+  <div class="frame">
+
+    <div class="topbar">
+      <div class="brand">
+        <span class="mark"><b>Body</b>Prompt</span>
+        <span class="tag">prompting as choreographic search</span>
+      </div>
+      <div class="spacer"></div>
+      <a class="chip" href="index.html">↩ all screens</a>
+      <span class="mode-pill">Triptych · probe battery</span>
+    </div>
+
+    <!-- one shared probe prompt fanned to all three models -->
+    <div class="promptbar">
+      <div class="prompt-input">
+        <span class="faint mono" style="font-size:11px;">probe →</span>
+        <span class="phrase">slip away</span>
+        <span class="caret"></span>
+      </div>
+      <button class="btn ghost">◧ overlay all</button>
+      <button class="btn">Run on all three</button>
+    </div>
+
+    <div class="triptych">
+
+      <!-- ---------- SnapMoGen — WRITE ---------- -->
+      <div class="col">
+        <div class="col-head">
+          <div class="name">SnapMoGen</div>
+          <div class="skel">24-joint · BVH-convertible · long expressive text</div>
+          <span class="mode-tag mode-write">✎ write</span>
+        </div>
+        <div class="col-stage">
+          <svg viewBox="0 0 320 380" width="86%" role="img" aria-label="SnapMoGen interpretation of the prompt">
+            <ellipse cx="160" cy="330" rx="52" ry="8" fill="rgba(0,0,0,0.4)"/>
+            <g class="figure">
+              <polyline class="fig-bone" points="160,214 160,192 160,166 160,140 160,112 160,86"/>
+              <polyline class="fig-bone" points="160,214 146,218 140,266 130,312 122,326"/>
+              <polyline class="fig-bone" points="160,214 176,218 184,266 196,308 206,322"/>
+              <polyline class="fig-bone" points="160,140 146,116 130,120 108,150 92,180"/>
+              <polyline class="fig-bone" points="160,140 174,116 190,120 214,146 236,166"/>
+              <g>
+                <circle class="fig-joint" cx="160" cy="112" r="3.4"/><circle class="fig-joint" cx="160" cy="140" r="3.4"/>
+                <circle class="fig-joint" cx="160" cy="166" r="3.4"/><circle class="fig-joint" cx="160" cy="192" r="3.4"/>
+                <circle class="fig-joint" cx="160" cy="214" r="3.8"/>
+                <circle class="fig-joint" cx="146" cy="218" r="3.4"/><circle class="fig-joint" cx="176" cy="218" r="3.4"/>
+                <circle class="fig-joint" cx="140" cy="266" r="3.4"/><circle class="fig-joint" cx="184" cy="266" r="3.4"/>
+                <circle class="fig-joint" cx="130" cy="120" r="3.4"/><circle class="fig-joint" cx="190" cy="120" r="3.4"/>
+                <circle class="fig-joint" cx="108" cy="150" r="3.4"/><circle class="fig-joint" cx="214" cy="146" r="3.4"/>
+              </g>
+              <g class="fig-landmark">
+                <circle cx="160" cy="86" r="8"/>
+                <circle cx="92" cy="180" r="4.6"/><circle cx="236" cy="166" r="4.6"/>
+                <circle cx="122" cy="326" r="4.2"/><circle cx="206" cy="322" r="4.2"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="col-input">
+          <div class="label">✎ write · pure expressive text</div>
+          <div class="textblock">slip away — quietly, without turning back; the weight shifting to the balls of the feet, the body already half-gone before the step…</div>
+        </div>
+      </div>
+
+      <!-- ---------- Language of Motion — VOICE ---------- -->
+      <div class="col">
+        <div class="col-head">
+          <div class="name">Language of Motion</div>
+          <div class="skel">SMPL-X whole body · face · hands · text + audio</div>
+          <span class="mode-tag mode-voice">🎙 voice</span>
+        </div>
+        <div class="col-stage">
+          <svg viewBox="0 0 320 380" width="86%" role="img" aria-label="Language of Motion interpretation of the prompt">
+            <ellipse cx="160" cy="330" rx="52" ry="8" fill="rgba(0,0,0,0.4)"/>
+            <g class="figure" style="--accent:#c78ad0;">
+              <polyline class="fig-bone" style="stroke:#c78ad0" points="160,214 158,192 156,166 156,140 158,112 160,86"/>
+              <polyline class="fig-bone" style="stroke:#c78ad0" points="160,214 148,218 138,266 148,312 140,326"/>
+              <polyline class="fig-bone" style="stroke:#c78ad0" points="160,214 174,218 186,264 182,310 192,324"/>
+              <polyline class="fig-bone" style="stroke:#c78ad0" points="156,140 142,118 126,124 116,158 128,190"/>
+              <polyline class="fig-bone" style="stroke:#c78ad0" points="156,140 172,118 188,124 200,158 190,192"/>
+              <g style="stroke:#c78ad0">
+                <circle class="fig-joint" cx="158" cy="112" r="3.4"/><circle class="fig-joint" cx="156" cy="140" r="3.4"/>
+                <circle class="fig-joint" cx="156" cy="166" r="3.4"/><circle class="fig-joint" cx="158" cy="192" r="3.4"/>
+                <circle class="fig-joint" cx="160" cy="214" r="3.8"/>
+                <circle class="fig-joint" cx="148" cy="218" r="3.4"/><circle class="fig-joint" cx="174" cy="218" r="3.4"/>
+                <circle class="fig-joint" cx="126" cy="124" r="3.4"/><circle class="fig-joint" cx="188" cy="124" r="3.4"/>
+              </g>
+              <g style="fill:#c78ad0">
+                <circle cx="160" cy="86" r="8"/>
+                <circle cx="128" cy="190" r="4.6"/><circle cx="190" cy="192" r="4.6"/>
+                <circle cx="140" cy="326" r="4.2"/><circle cx="192" cy="324" r="4.2"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="col-input">
+          <div class="label">🎙 voice · text + performed audio</div>
+          <div class="textblock" style="display:flex;align-items:center;gap:10px;font-style:normal;">
+            <span style="color:#c78ad0;font-size:18px;">◉</span>
+            <svg viewBox="0 0 200 34" width="100%" height="30" aria-label="audio waveform">
+              <g stroke="#c78ad0" stroke-width="2.4" stroke-linecap="round">
+                <line x1="6" y1="17" x2="6" y2="17"/><line x1="16" y1="10" x2="16" y2="24"/>
+                <line x1="26" y1="4" x2="26" y2="30"/><line x1="36" y1="12" x2="36" y2="22"/>
+                <line x1="46" y1="7" x2="46" y2="27"/><line x1="56" y1="14" x2="56" y2="20"/>
+                <line x1="66" y1="2" x2="66" y2="32"/><line x1="76" y1="11" x2="76" y2="23"/>
+                <line x1="86" y1="8" x2="86" y2="26"/><line x1="96" y1="15" x2="96" y2="19"/>
+                <line x1="106" y1="5" x2="106" y2="29"/><line x1="116" y1="13" x2="116" y2="21"/>
+                <line x1="126" y1="9" x2="126" y2="25"/><line x1="136" y1="3" x2="136" y2="31"/>
+                <line x1="146" y1="12" x2="146" y2="22"/><line x1="156" y1="7" x2="156" y2="27"/>
+                <line x1="166" y1="14" x2="166" y2="20"/><line x1="176" y1="10" x2="176" y2="24"/>
+                <line x1="186" y1="6" x2="186" y2="28"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Kimodo — SCULPT ---------- -->
+      <div class="col">
+        <div class="col-head">
+          <div class="name">Kimodo <span class="faint" style="font-weight:400;font-size:11px;">/ NVIDIA</span></div>
+          <div class="skel">SOMA 77-joint · text + keyframes + floor paths</div>
+          <span class="mode-tag mode-sculpt">✥ sculpt</span>
+        </div>
+        <div class="col-stage">
+          <svg viewBox="0 0 320 380" width="86%" role="img" aria-label="Kimodo interpretation of the prompt">
+            <ellipse cx="160" cy="330" rx="52" ry="8" fill="rgba(0,0,0,0.4)"/>
+            <g class="figure">
+              <polyline class="fig-bone" style="stroke:#74a7c8" points="160,214 164,192 168,166 170,140 168,112 164,86"/>
+              <polyline class="fig-bone" style="stroke:#74a7c8" points="160,214 150,220 132,258 112,296 100,306"/>
+              <polyline class="fig-bone" style="stroke:#74a7c8" points="160,214 178,216 196,254 214,292 226,300"/>
+              <polyline class="fig-bone" style="stroke:#74a7c8" points="170,140 156,116 138,116 118,140 104,166"/>
+              <polyline class="fig-bone" style="stroke:#74a7c8" points="170,140 186,118 206,120 226,146 240,176"/>
+              <g style="stroke:#74a7c8">
+                <circle class="fig-joint" cx="168" cy="112" r="3.4"/><circle class="fig-joint" cx="170" cy="140" r="3.4"/>
+                <circle class="fig-joint" cx="168" cy="166" r="3.4"/><circle class="fig-joint" cx="164" cy="192" r="3.4"/>
+                <circle class="fig-joint" cx="160" cy="214" r="3.8"/>
+                <circle class="fig-joint" cx="150" cy="220" r="3.4"/><circle class="fig-joint" cx="178" cy="216" r="3.4"/>
+                <circle class="fig-joint" cx="138" cy="116" r="3.4"/><circle class="fig-joint" cx="206" cy="120" r="3.4"/>
+              </g>
+              <g style="fill:#74a7c8">
+                <circle cx="164" cy="86" r="8"/>
+                <circle cx="104" cy="166" r="4.6"/><circle cx="240" cy="176" r="4.6"/>
+                <circle cx="100" cy="306" r="4.2"/><circle cx="226" cy="300" r="4.2"/>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="col-input">
+          <div class="label">✥ sculpt · keyframes + floor path</div>
+          <!-- keyframe timeline -->
+          <svg viewBox="0 0 260 30" width="100%" height="24" style="margin-bottom:8px;" aria-label="keyframe timeline">
+            <line x1="4" y1="15" x2="256" y2="15" stroke="var(--line-strong)" stroke-width="1.5"/>
+            <g fill="#74a7c8" stroke="#101218" stroke-width="1">
+              <rect x="20" y="9" width="12" height="12" transform="rotate(45 26 15)"/>
+              <rect x="104" y="9" width="12" height="12" transform="rotate(45 110 15)"/>
+              <rect x="196" y="9" width="12" height="12" transform="rotate(45 202 15)"/>
+            </g>
+          </svg>
+          <!-- floor-path waypoints -->
+          <svg viewBox="0 0 260 56" width="100%" height="48" aria-label="floor path with waypoints">
+            <rect x="1" y="1" width="258" height="54" rx="6" fill="var(--panel-2)" stroke="var(--line)"/>
+            <path d="M30,42 C80,10 150,50 200,18" fill="none" stroke="#74a7c8" stroke-width="2" stroke-dasharray="4 4"/>
+            <g fill="#74a7c8"><circle cx="30" cy="42" r="4"/><circle cx="120" cy="30" r="4"/><circle cx="200" cy="18" r="4"/></g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="caption">
+    <b>03 · Triptych.</b> One probe prompt (<i>"slip away"</i>), three models — but the
+    wrapper deliberately does <b>not</b> flatten them into one text box. Each keeps its
+    native authoring: SnapMoGen you <b>write</b>, Language of Motion you <b>voice</b>,
+    Kimodo you <b>sculpt</b> with keyframes and floor paths. Same output and render
+    layer, different authoring feel — that difference is itself a finding.
+  </p>
+</body>
+</html>
