@@ -98,6 +98,48 @@ html, body {
 }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
+/* ---- lineage rail ---- */
+.rail {
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rail-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.rail-scroll { flex: 1; overflow: auto; padding: 8px 4px; }
+.rail-hint {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+}
+.rail-hint b { color: var(--ink-dim); }
+
+/* the tree itself (SVG, rebuilt on every change by lineage.ts) */
+.tree-empty { fill: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
+.tree-edge { stroke: var(--line); stroke-width: 1.5; }
+.tree-node { cursor: pointer; outline: none; }
+.tree-dot { fill: var(--ink-faint); transition: fill 0.12s; }
+.tree-label { fill: var(--ink-dim); font-family: var(--mono); font-size: 11px; }
+.tree-node:hover .tree-dot { fill: var(--ink-dim); }
+.tree-node:hover .tree-label { fill: var(--ink); }
+.tree-node:focus-visible .tree-dot { stroke: var(--accent); stroke-width: 2; }
+.tree-node.current .tree-dot { fill: var(--accent); }
+.tree-node.current .tree-label { fill: var(--ink); }
+
 /* ---- stage ---- */
 .body { flex: 1; display: flex; min-height: 0; }
 .stage-view { flex: 1; position: relative; min-height: 0; }

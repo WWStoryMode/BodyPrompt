@@ -14,7 +14,7 @@
         <span class="brand"><b>Body</b>Prompt</span>
         <span class="tag">prompting as choreographic search</span>
         <span class="spacer"></span>
-        <span class="mode-pill">Lab bench · live</span>
+        <span class="mode-pill">Search instrument · live</span>
       </div>
 
       <div class="promptbar">
@@ -33,6 +33,17 @@
       </div>
 
       <div class="body">
+        <!-- Prompt lineage: every Generate adds a node; click one to replay it. -->
+        <aside class="rail">
+          <div class="rail-title">lineage · the search</div>
+          <div class="rail-scroll">
+            <svg id="lineage-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="rail-hint">
+            refine &amp; <b>Generate</b> to extend · click a past node to branch from it
+          </div>
+        </aside>
+
         <div id="stage" class="stage-view">
           <div id="telemetry" class="telemetry"></div>
           <div id="hint" class="hint">
