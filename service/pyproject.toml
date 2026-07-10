@@ -1,0 +1,12 @@
+[project]
+name = "bodyprompt-service"
+version = "0.0.1"
+description = "BodyPrompt inference service — v0 stub serving hand-authored canonical-motion fixtures (no ML)."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[tool.uv]
+# no dev deps yet
