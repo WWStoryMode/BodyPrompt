@@ -10,6 +10,7 @@ import { JOINT_INDEX, LANDMARK_JOINTS, TRAIL_JOINTS } from "./skeleton";
 
 // House palette (matches frontend/mockups/styles.css).
 const STAGE_BG = 0x0b0c10;
+const PERF_BG = 0x07080b; // performance: darker, for a projector in a dark room
 const ACCENT = 0xe9b872; // bone/amber
 const BONE = 0xd8b985;
 const GRID = 0x232732;
@@ -55,6 +56,10 @@ export class StickFigureRenderer {
   private frameFloat = 0;
   private playing = false;
   private listener?: FrameListener;
+  private tempo = 1; // 0.5 = half speed — the performer needs time to read and follow
+
+  // the stage itself: a lab bench is lit for inspection, a performance is lit for a room
+  private grid?: THREE.GridHelper;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -81,6 +86,7 @@ export class StickFigureRenderer {
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.5;
     this.scene.add(grid);
+    this.grid = grid;
 
     // keep the canvas matched to its container
     const ro = new ResizeObserver(() => this.onResize());
@@ -140,6 +146,29 @@ export class StickFigureRenderer {
   setGhostsVisible(on: boolean): void {
     this.ghostsVisible = on;
     for (const g of this.ghosts) g.lines.visible = on;
+  }
+
+  /** Playback rate. 0.5 = half speed — slow enough for a body in the room to follow. */
+  setTempo(rate: number): void {
+    this.tempo = Math.max(0.05, rate);
+    this.emit();
+  }
+
+  getTempo(): number {
+    return this.tempo;
+  }
+
+  /**
+   * Light the stage for a room rather than for inspection: a darker ground, a dimmer
+   * grid. The figure stays exactly as it is — this is the *only* honest thing to change,
+   * since the notation is the work.
+   */
+  setPerformanceMode(on: boolean): void {
+    this.scene.background = new THREE.Color(on ? PERF_BG : STAGE_BG);
+    if (this.grid) {
+      const mat = this.grid.material as THREE.Material;
+      mat.opacity = on ? 0.22 : 0.5;
+    }
   }
 
   play(): void {
@@ -289,7 +318,7 @@ export class StickFigureRenderer {
 
     if (this.playing && this.motion) {
       const last = this.motion.frames.length - 1;
-      this.frameFloat += dt * this.motion.fps;
+      this.frameFloat += dt * this.motion.fps * this.tempo;
       if (this.frameFloat > last) this.frameFloat -= last; // loop
       this.applyFrame(this.frameFloat);
       this.emit();
