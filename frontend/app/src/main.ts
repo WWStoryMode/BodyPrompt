@@ -13,6 +13,9 @@ import type { CanonicalMotion } from "./types";
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
 const API_BASE = "http://localhost:8000";
 
+// How many motions one prompt returns: the primary + (VARIANTS - 1) ghosts.
+const VARIANTS = 4;
+
 // ---- DOM ----
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const promptEl = $<HTMLInputElement>("prompt");
@@ -24,6 +27,7 @@ const hintEl = $<HTMLDivElement>("hint");
 const playPauseEl = $<HTMLButtonElement>("playpause");
 const scrubEl = $<HTMLInputElement>("scrub");
 const counterEl = $<HTMLSpanElement>("counter");
+const ghostsEl = $<HTMLInputElement>("ghosts");
 const lineageSvgEl = document.getElementById("lineage-svg") as unknown as SVGSVGElement;
 
 // ---- renderer + lineage ----
@@ -44,14 +48,22 @@ function drawTree(): void {
 }
 
 // Load a motion into the stage + telemetry. Shared by Generate and node-replay.
+// A motion carries its own ghost-cloud in `variants`, so replaying a past node
+// restores that node's cloud too.
 function showMotion(motion: CanonicalMotion): void {
   hintEl.classList.add("hidden");
   renderer.load(motion);
+  renderer.setGhostsVisible(ghostsEl.checked);
+
+  const ghostCount = motion.variants?.length ?? 0;
   telemetryEl.innerHTML =
     `<span class="k">model</span> ${motion.model}<br>` +
     `<span class="k">prompt</span> “${motion.prompt}”<br>` +
     `<span class="k">seed</span> ${motion.seed}<br>` +
     `<span class="k">joints</span> ${motion.joints.length} · ${motion.skeleton}<br>` +
+    (ghostCount
+      ? `<span class="k">cloud</span> ${ghostCount} other seeds<br>`
+      : "") +
     (motion.stub ? `<span class="stub">stub · hand-authored fixture (no ML)</span>` : "");
 }
 
@@ -71,7 +83,11 @@ async function generate(): Promise<void> {
     const res = await fetch(`${API_BASE}/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: modelEl.value, prompt: promptEl.value }),
+      body: JSON.stringify({
+        model: modelEl.value,
+        prompt: promptEl.value,
+        variants: VARIANTS, // ask for the ghost-cloud alongside the primary
+      }),
     });
     if (!res.ok) throw new Error(`service responded ${res.status}`);
     const motion = (await res.json()) as CanonicalMotion;
@@ -100,6 +116,7 @@ promptEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") generate();
 });
 playPauseEl.addEventListener("click", () => renderer.togglePlay());
+ghostsEl.addEventListener("change", () => renderer.setGhostsVisible(ghostsEl.checked));
 
 scrubEl.addEventListener("input", () => {
   userScrubbing = true;

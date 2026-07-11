@@ -22,4 +22,9 @@ export interface CanonicalMotion {
   seed: number;
   /** True when the motion came from the v0 stub rather than a model. */
   stub?: boolean;
+  /**
+   * The ghost-cloud: siblings of this motion from the same prompt with different seeds.
+   * Present only when the caller asked for `variants > 1`. Siblings never nest their own.
+   */
+  variants?: CanonicalMotion[];
 }

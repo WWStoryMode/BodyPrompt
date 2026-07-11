@@ -13,10 +13,16 @@ const STAGE_BG = 0x0b0c10;
 const ACCENT = 0xe9b872; // bone/amber
 const BONE = 0xd8b985;
 const GRID = 0x232732;
+const GHOST = 0x74a7c8; // cool tint — the variance cloud
 
 // Trail shape: how many ghost samples, and how many source-frames apart.
 const TRAIL_LEN = 8;
 const TRAIL_STEP = 2;
+
+// The ghost-cloud: bones only (no joints, no trails) so many figures stay legible.
+// Opacity is a balance — high enough that the variance actually reads as a cloud,
+// low enough that the selected figure stays clearly the subject.
+const GHOST_OPACITY = 0.34;
 
 /** How the renderer reports playhead changes back to the UI. */
 export type FrameListener = (info: {
@@ -39,6 +45,10 @@ export class StickFigureRenderer {
   private boneLines?: THREE.LineSegments;
   private bonePositions?: THREE.BufferAttribute;
   private trailMeshes: Map<number, THREE.Mesh[]> = new Map(); // jointIndex -> ghost spheres
+
+  // the variance ghost-cloud — one translucent bones-only figure per sibling motion
+  private ghosts: { motion: CanonicalMotion; lines: THREE.LineSegments; attr: THREE.BufferAttribute }[] = [];
+  private ghostsVisible = true;
 
   // playback
   private motion?: CanonicalMotion;
@@ -77,13 +87,57 @@ export class StickFigureRenderer {
     this.animate();
   }
 
-  /** Load a motion, build its figure, and start from frame 0. */
+  /**
+   * Load a motion, build its figure, and start from frame 0.
+   * Also builds the ghost-cloud from `motion.variants` (if the service sent any).
+   */
   load(motion: CanonicalMotion): void {
     this.motion = motion;
     this.frameFloat = 0;
     this.buildFigure(motion);
+    this.loadGhosts(motion.variants ?? []);
     this.applyFrame(0);
     this.play();
+  }
+
+  /**
+   * Build the variance cloud: one translucent, bones-only figure per sibling motion.
+   * They play in lock-step with the primary, so the cloud moves *with* the figure —
+   * one prompt, many seeds, all doing "the same thing" slightly differently.
+   */
+  loadGhosts(motions: CanonicalMotion[]): void {
+    for (const g of this.ghosts) {
+      this.scene.remove(g.lines);
+      g.lines.geometry.dispose();
+      (g.lines.material as THREE.Material).dispose();
+    }
+    this.ghosts = [];
+
+    for (const motion of motions) {
+      const geo = new THREE.BufferGeometry();
+      const attr = new THREE.BufferAttribute(
+        new Float32Array(motion.edges.length * 2 * 3),
+        3,
+      );
+      geo.setAttribute("position", attr);
+      const lines = new THREE.LineSegments(
+        geo,
+        new THREE.LineBasicMaterial({
+          color: GHOST,
+          transparent: true,
+          opacity: GHOST_OPACITY,
+          depthWrite: false, // so overlapping ghosts blend instead of z-fighting
+        }),
+      );
+      lines.visible = this.ghostsVisible;
+      this.scene.add(lines);
+      this.ghosts.push({ motion, lines, attr });
+    }
+  }
+
+  setGhostsVisible(on: boolean): void {
+    this.ghostsVisible = on;
+    for (const g of this.ghosts) g.lines.visible = on;
   }
 
   play(): void {
@@ -206,6 +260,24 @@ export class StickFigureRenderer {
         const p = motion.frames[sample].positions[idx];
         ghosts[k].position.set(p[0], p[1], p[2]);
       }
+    }
+
+    // the ghost-cloud — same frame index, clamped to each sibling's own length
+    for (const ghost of this.ghosts) {
+      if (!ghost.lines.visible) continue;
+      const gm = ghost.motion;
+      const gi = Math.max(0, Math.min(gm.frames.length - 1, i));
+      const gpos = gm.frames[gi].positions;
+      const garr = ghost.attr.array as Float32Array;
+      gm.edges.forEach((edge, e) => {
+        const [child, parent] = edge;
+        const c = gpos[child];
+        const pa = gpos[parent];
+        const o = e * 6;
+        garr[o] = c[0]; garr[o + 1] = c[1]; garr[o + 2] = c[2];
+        garr[o + 3] = pa[0]; garr[o + 4] = pa[1]; garr[o + 5] = pa[2];
+      });
+      ghost.attr.needsUpdate = true;
     }
   }
 

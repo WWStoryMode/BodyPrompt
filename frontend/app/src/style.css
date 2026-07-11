@@ -9,6 +9,7 @@
   --ink-dim: #9aa0ac;
   --ink-faint: #5b616e;
   --accent: #e9b872;
+  --ghost: #74a7c8; /* cool tint — the variance cloud */
   --line: #232732;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -194,6 +195,19 @@ html, body {
   min-width: 78px;
 }
 .scrub { flex: 1; accent-color: var(--accent); }
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.toggle input { accent-color: var(--ghost); cursor: pointer; }
+.toggle input:checked + span { color: var(--ghost); }
 .counter {
   font-family: var(--mono);
   font-size: 12px;
