@@ -41,6 +41,8 @@ GENERATOR = make_generator()
 class GenerateRequest(BaseModel):
     model: str = "snapmogen"
     prompt: str = ""
+    # >1 asks for a ghost-cloud: the motion plus (variants - 1) seeded siblings.
+    variants: int = 1
 
 
 @app.get("/health")
@@ -57,6 +59,6 @@ def health() -> dict:
 def generate(req: GenerateRequest) -> dict:
     """Delegate to the active backend; surface backend errors as a clear message."""
     try:
-        return GENERATOR.generate(req.model, req.prompt)
+        return GENERATOR.generate(req.model, req.prompt, variants=max(1, req.variants))
     except RuntimeError as err:
         return {"error": str(err)}
