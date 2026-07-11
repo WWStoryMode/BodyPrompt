@@ -91,10 +91,11 @@ once research log, score, and set.
 The five screens in this repo are **mockups of research instruments**, each answering
 "how does this help the search?" — not "what feature is this?"
 
-*The five screens below are the original mockups. Much of screens **01, 02 and 04 now exist
-as a real, running app** on stub data — the Lab Bench, the prompt-lineage tree, the variance
-ghost-cloud, the notation strip and the floor path all work. See [Run it](#run-it) and
-Status. Screens 03 (triptych) and 05 (performance mode) are still mockups.*
+*The five screens below are the original mockups. Screens **01, 02, 04 and 05 now exist as a
+real, running app** on stub data — the Lab Bench, the prompt-lineage tree, the variance
+ghost-cloud, the notation strip, the floor path, and **performance mode** all work. See
+[Run it](#run-it) and Status. Only screen 03 (the multi-model triptych) is still a mockup —
+it needs models that actually differ.*
 
 | # | Instrument | What it lets the research do |
 |---|-----------|------------------------------|
@@ -161,9 +162,10 @@ in front of an audience:
 | **v0.5** | First functional slice — the search loop runs on **stub** data (schema + renderer + service, no ML) | ✓ done |
 | **v2** | **Prompt lineage** — the branching search retained and navigable | ✓ done |
 | **v2.5** | **Variance** (ghost-cloud) + **notation registers** (score + floor path) | ✓ done |
+| **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — a real model behind the service (needs weights + a GPU) | next |
 | **v3** | Multi-model comparison — how models diverge on one theme | |
-| **v4** | Public lecture performance — the search performed live | |
+| **v4** | The public lecture performance itself — the search performed live | |
 | **v5** | Open research platform — others can search too | |
 
 The research instruments were deliberately built **before** the model: the whole loop —
@@ -233,6 +235,21 @@ pnpm dev
 Open <http://localhost:5173>, type a phrase, click **Generate** — a 3D stick figure
 animates; drag to orbit, use play/pause and the scrub bar. To re-author the motions, edit
 and re-run `python3 fixtures/_generate.py`.
+
+### Performing it
+
+Hit **Perform** (or press <kbd>P</kbd>) for the projectable stage: the instrument chrome
+falls away, the phrase goes large, playback slows to half speed to be followed by a body —
+but the **lineage keeps growing** and you can still type and generate live, in front of the
+room. <http://localhost:5173/?perform=1> boots straight into it, for plugging into a projector.
+
+| key | |
+|---|---|
+| <kbd>P</kbd> | enter / leave performance mode |
+| <kbd>space</kbd> | play / pause |
+| <kbd>T</kbd> | cycle tempo (0.5× → 0.25× → 1×) |
+| <kbd>G</kbd> | ghost-cloud on / off |
+| <kbd>esc</kbd> | leave performance mode |
 
 The original static mockups need no build — just `open frontend/mockups/index.html`.
 
