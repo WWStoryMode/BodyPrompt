@@ -214,6 +214,109 @@ html, body {
 .hint.hidden { display: none; }
 .hint code { color: var(--ink-dim); }
 
+/* =========================================================================
+   PERFORMANCE MODE — a stripped, projectable stage for the lecture-performance.
+   Same session, same lineage: the performer keeps working, the room sees only
+   the body, the phrase and the score. Toggled by adding .performing to #app.
+   ========================================================================= */
+
+.chip-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.chip-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* the phrase the room is watching — hidden until performing */
+.perf-overlay { display: none; }
+.perf-phrase {
+  font-size: 30px;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--ink);
+  max-width: 80%;
+  margin: 0 auto;
+}
+.perf-meta {
+  margin-top: 16px;
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.perf-meta .on { color: var(--accent); }
+.perf-keys { opacity: 0.55; text-transform: none; letter-spacing: 0.04em; }
+
+/* ---- what changes when performing ---- */
+#app.performing { background: #07080b; }
+
+#app.performing .perf-overlay {
+  display: block;
+  position: absolute;
+  bottom: 46px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* a spotlight, so the eye goes to the body */
+#app.performing .stage-view::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    46% 56% at 50% 44%,
+    rgba(233, 184, 114, 0.07),
+    transparent 70%
+  );
+}
+
+/* strip the instrument chrome — keep only what the room needs */
+#app.performing .topbar,
+#app.performing .transport { background: #07080b; border-color: rgba(255, 255, 255, 0.05); }
+#app.performing .tag,
+#app.performing .telemetry,
+#app.performing .model-select,
+#app.performing .counter,
+#app.performing .toggle,
+#app.performing .rail-hint,
+#app.performing .nota-key { display: none; }
+#app.performing .scrub { opacity: 0.35; }
+#app.performing .btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+#app.performing .prompt-input {
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  font-size: 17px;
+}
+#app.performing .prompt-input:focus { border-bottom-color: var(--accent); }
+
+/* the lineage keeps growing in the corner — research log as set */
+#app.performing .rail {
+  width: 210px;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+#app.performing .rail-right { width: 300px; }
+#app.performing .rail-title { color: var(--ink-faint); }
+
+/* the score, but bigger — it has to be readable by a body, from across a room */
+#app.performing .nota-glyph { stroke-width: 2.6; }
+#app.performing .nota-label { font-size: 11px; fill: var(--ink-dim); }
+#app.performing .floor-trace { stroke-width: 2.6; }
+
 /* ---- transport ---- */
 .transport {
   display: flex;

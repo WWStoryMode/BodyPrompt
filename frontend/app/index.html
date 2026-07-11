@@ -14,7 +14,8 @@
         <span class="brand"><b>Body</b>Prompt</span>
         <span class="tag">prompting as choreographic search</span>
         <span class="spacer"></span>
-        <span class="mode-pill">Search instrument · live</span>
+        <button id="perform" class="chip-btn" title="Performance mode (P)">Perform</button>
+        <span id="mode-pill" class="mode-pill">Search instrument · live</span>
       </div>
 
       <div class="promptbar">
@@ -46,6 +47,18 @@
 
         <div id="stage" class="stage-view">
           <div id="telemetry" class="telemetry"></div>
+
+          <!-- Performance mode: the phrase the room is watching the body search for. -->
+          <div id="perf-overlay" class="perf-overlay">
+            <div id="perf-phrase" class="perf-phrase"></div>
+            <div class="perf-meta">
+              <span>⟳ loop</span>
+              <span id="perf-tempo" class="on">0.5× tempo</span>
+              <span>re-embody</span>
+              <span class="perf-keys">space play · T tempo · esc exit</span>
+            </div>
+          </div>
+
           <div id="hint" class="hint">
             Start the service, then click <b>Generate</b>.<br />
             <code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>
@@ -54,7 +67,7 @@
 
         <!-- The legible reduction: movement you can read, compare, and re-embody. -->
         <aside class="rail rail-right">
-          <div class="rail-title">notation · the score</div>
+          <div id="score-title" class="rail-title">notation · the score</div>
           <div class="rail-scroll">
             <div class="nota-block">
               <div class="nota-cap">phrase · per limb</div>

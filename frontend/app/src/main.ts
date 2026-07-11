@@ -32,6 +32,12 @@ const ghostsEl = $<HTMLInputElement>("ghosts");
 const lineageSvgEl = document.getElementById("lineage-svg") as unknown as SVGSVGElement;
 const notationSvgEl = document.getElementById("notation-svg") as unknown as SVGSVGElement;
 const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElement;
+const appEl = $<HTMLDivElement>("app");
+const performEl = $<HTMLButtonElement>("perform");
+const modePillEl = $<HTMLSpanElement>("mode-pill");
+const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
+const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
+const scoreTitleEl = $<HTMLDivElement>("score-title");
 
 // The score is rebuilt once per motion; playback only moves these playheads.
 let setNotationFrame: ((frame: number) => void) | null = null;
@@ -54,6 +60,44 @@ function drawTree(): void {
   });
 }
 
+// ---- performance mode ----
+//
+// Not a separate page: the same session, the same lineage. The performer keeps working
+// (typing, generating, branching) while the room sees only the body, the phrase and the
+// score. Slowed down, because a human has to be able to follow and re-embody it.
+
+const TEMPOS = [0.5, 0.25, 1]; // performance opens at half speed; T cycles
+let performing = false;
+let tempoIdx = 0;
+
+function setTempo(rate: number): void {
+  renderer.setTempo(rate);
+  perfTempoEl.textContent = `${rate}× tempo`;
+}
+
+function setPerforming(on: boolean): void {
+  performing = on;
+  appEl.classList.toggle("performing", on);
+  renderer.setPerformanceMode(on);
+
+  performEl.textContent = on ? "Exit" : "Perform";
+  modePillEl.textContent = on ? "Performance" : "Search instrument · live";
+  scoreTitleEl.textContent = on ? "the score · for the body" : "notation · the score";
+
+  if (on) {
+    tempoIdx = 0;
+    setTempo(TEMPOS[tempoIdx]);
+    renderer.play();
+  } else {
+    setTempo(1);
+  }
+}
+
+function cycleTempo(): void {
+  tempoIdx = (tempoIdx + 1) % TEMPOS.length;
+  setTempo(TEMPOS[tempoIdx]);
+}
+
 // Load a motion into the stage + telemetry. Shared by Generate and node-replay.
 // A motion carries its own ghost-cloud in `variants`, so replaying a past node
 // restores that node's cloud too.
@@ -65,6 +109,9 @@ function showMotion(motion: CanonicalMotion): void {
   // rebuild the legible reduction for this motion
   setNotationFrame = renderNotationStrip(notationSvgEl, motion);
   setFloorFrame = renderFloorPath(floorSvgEl, motion);
+
+  // the phrase the room is watching the body search for
+  perfPhraseEl.textContent = `“${motion.prompt}”`;
 
   const ghostCount = motion.variants?.length ?? 0;
   telemetryEl.innerHTML =
@@ -140,7 +187,45 @@ scrubEl.addEventListener("change", () => {
   userScrubbing = false;
 });
 
+performEl.addEventListener("click", () => setPerforming(!performing));
+
+// Stage shortcuts. Ignored while typing a prompt — except Escape, which always gets you
+// out (you do not want to be hunting for a mouse in front of an audience).
+window.addEventListener("keydown", (e) => {
+  const typing = document.activeElement === promptEl;
+
+  if (e.key === "Escape") {
+    if (performing) setPerforming(false);
+    else promptEl.blur();
+    return;
+  }
+  if (typing) return;
+
+  switch (e.key.toLowerCase()) {
+    case " ":
+      e.preventDefault(); // don't scroll the page
+      renderer.togglePlay();
+      break;
+    case "p":
+      setPerforming(!performing);
+      break;
+    case "t":
+      cycleTempo();
+      break;
+    case "g":
+      ghostsEl.checked = !ghostsEl.checked;
+      renderer.setGhostsVisible(ghostsEl.checked);
+      break;
+  }
+});
+
 // Draw the (empty) tree, then generate once on load so the stage isn't empty and the
 // search has a root (fails gracefully if the service is down).
 drawTree();
 generate();
+
+// ?perform=1 boots straight into performance mode — for plugging into a projector
+// without fumbling through the instrument chrome in front of a room.
+if (new URLSearchParams(location.search).has("perform")) {
+  setPerforming(true);
+}
