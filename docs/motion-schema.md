@@ -47,6 +47,27 @@ One motion is one JSON object:
 | `prompt` | The phrase this motion answers. |
 | `model` | Which model (nominally) produced it. In v0 this is just an echo. |
 | `seed` | Generation seed — part of making variation reproducible. |
+| `variants` | *Optional.* The **ghost-cloud**: sibling motions from the same prompt with different seeds (see below). |
+
+## The ghost-cloud (`variants`)
+
+Ask `POST /generate` for `{"prompt": …, "variants": 4}` and the returned motion carries a
+`variants` array of **3 siblings** — the same prompt, different seeds. The frontend draws them
+as translucent figures around the selected one, making the **variability of the search visible**:
+*"BodyPrompt embraces the variability of generative systems as a creative resource."*
+
+- The field is **additive and optional**. `variants: 1` (the default) returns exactly what it
+  always did, so older clients are unaffected.
+- Each sibling is itself a complete, valid canonical motion with its own `seed`. **Siblings never
+  nest their own `variants`.**
+- Variance is **deterministic**: the same prompt always produces the same cloud.
+
+> **Honesty note.** In v0 the siblings are *not* a model sampling different outputs. They are a
+> seeded perturbation of the base fixture (`vary()` in `service/app/generators.py`): each joint
+> gets a smooth sinusoidal wander whose amplitude is scaled per joint — the pelvis and spine
+> barely move, the wrists and head move most — so a cloud reads as *the same intention,
+> differently expressed*. When a real model lands, it replaces this with genuine multi-seed
+> sampling and nothing else has to change.
 
 ## Skeleton `smpl-22`
 
