@@ -317,6 +317,82 @@ html, body {
 #app.performing .nota-label { font-size: 11px; fill: var(--ink-dim); }
 #app.performing .floor-trace { stroke-width: 2.6; }
 
+/* =========================================================================
+   TRIPTYCH — one prompt, three models. Hidden until #app.comparing.
+   ========================================================================= */
+
+.tri { display: none; }
+#app.comparing .body { display: none; }
+#app.comparing .tri { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+/* the ghost-cloud compares seeds, not models — it has no job here */
+#app.comparing .toggle { display: none; }
+
+/* the honesty banner — the differences below are stub artefacts, not findings */
+.tri-banner {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+  background: rgba(233, 184, 114, 0.06);
+  border-bottom: 1px solid var(--line);
+  padding: 9px 16px;
+}
+.tri-banner b { color: var(--accent); }
+
+.tri-cols { flex: 1; display: flex; min-height: 0; }
+.tri-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+.tri-col:last-child { border-right: none; }
+
+.tri-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.tri-name { font-size: 13px; font-weight: 600; }
+.tri-mode {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.tri-stage { flex: 1; min-height: 0; position: relative; }
+.tri-stage canvas { display: block; }
+.tri-foot {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  padding: 9px 14px;
+  border-top: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* one colour per model — the same coding as the mockups */
+.tri-col[data-model="snapmogen"] .tri-name,
+.tri-col[data-model="snapmogen"] .tri-mode { color: #e9b872; }
+.tri-col[data-model="snapmogen"] .tri-mode { border-color: rgba(233, 184, 114, 0.4); }
+
+.tri-col[data-model="language-of-motion"] .tri-name,
+.tri-col[data-model="language-of-motion"] .tri-mode { color: #c78ad0; }
+.tri-col[data-model="language-of-motion"] .tri-mode { border-color: rgba(199, 138, 208, 0.4); }
+
+.tri-col[data-model="kimodo"] .tri-name,
+.tri-col[data-model="kimodo"] .tri-mode { color: #74a7c8; }
+.tri-col[data-model="kimodo"] .tri-mode { border-color: rgba(116, 167, 200, 0.4); }
+
 /* ---- transport ---- */
 .transport {
   display: flex;

@@ -34,6 +34,7 @@ const notationSvgEl = document.getElementById("notation-svg") as unknown as SVGS
 const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElement;
 const appEl = $<HTMLDivElement>("app");
 const performEl = $<HTMLButtonElement>("perform");
+const triptychEl = $<HTMLButtonElement>("triptych");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
@@ -58,6 +59,69 @@ function drawTree(): void {
     showMotion(node.motion);
     drawTree();
   });
+}
+
+// ---- the triptych: one prompt, three models ----
+//
+// The models keep their NATIVE way of authoring — write / voice / sculpt — because the
+// difference in *how you author* is itself part of the research. (Only `write` is wired
+// up; voice and sculpt are labelled but not built.)
+//
+// Ghosts are off here on purpose: the ghost-cloud compares SEEDS, the triptych compares
+// MODELS. Overlaying both would just be noise.
+
+const TRI_MODELS = [
+  { id: "snapmogen", accent: 0xe9b872 },
+  { id: "language-of-motion", accent: 0xc78ad0 },
+  { id: "kimodo", accent: 0x74a7c8 },
+];
+
+let comparing = false;
+const triRenderers = new Map<string, StickFigureRenderer>();
+
+/** Renderers are built lazily — a WebGL context per panel is not free. */
+function triRenderer(modelId: string, accent: number): StickFigureRenderer {
+  let r = triRenderers.get(modelId);
+  if (!r) {
+    const host = document.getElementById(`tri-stage-${modelId}`) as HTMLDivElement;
+    r = new StickFigureRenderer(host, { accent, grid: false });
+    triRenderers.set(modelId, r);
+  }
+  return r;
+}
+
+/** Ask all three models the same question, at once. */
+async function generateTriptych(): Promise<void> {
+  const prompt = promptEl.value;
+  await Promise.all(
+    TRI_MODELS.map(async ({ id, accent }) => {
+      const footEl = document.getElementById(`tri-foot-${id}`) as HTMLDivElement;
+      const r = triRenderer(id, accent);
+      try {
+        const res = await fetch(`${API_BASE}/generate`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ model: id, prompt, variants: 1 }),
+        });
+        if (!res.ok) throw new Error(`service responded ${res.status}`);
+        const motion = (await res.json()) as CanonicalMotion;
+        r.load(motion);
+        footEl.textContent = `seed ${motion.seed} · ${motion.frames.length} frames${
+          motion.stub ? " · stub" : ""
+        }`;
+      } catch (err) {
+        footEl.textContent = `error: ${(err as Error).message}`;
+      }
+    }),
+  );
+}
+
+function setComparing(on: boolean): void {
+  comparing = on;
+  appEl.classList.toggle("comparing", on);
+  triptychEl.textContent = on ? "Close" : "Compare";
+  modePillEl.textContent = on ? "Triptych · three models" : "Search instrument · live";
+  if (on) generateTriptych();
 }
 
 // ---- performance mode ----
@@ -172,16 +236,31 @@ async function generate(): Promise<void> {
 }
 
 // ---- events ----
-generateEl.addEventListener("click", generate);
+// One prompt bar drives whichever instrument is open.
+function generateHere(): void {
+  if (comparing) generateTriptych();
+  else generate();
+}
+
+generateEl.addEventListener("click", generateHere);
 promptEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") generate();
+  if (e.key === "Enter") generateHere();
 });
-playPauseEl.addEventListener("click", () => renderer.togglePlay());
+triptychEl.addEventListener("click", () => setComparing(!comparing));
+
+playPauseEl.addEventListener("click", () => {
+  renderer.togglePlay();
+  // in the triptych the three panels move together — comparing motions that are out of
+  // step with each other would tell you nothing
+  for (const r of triRenderers.values()) r.togglePlay();
+});
 ghostsEl.addEventListener("change", () => renderer.setGhostsVisible(ghostsEl.checked));
 
 scrubEl.addEventListener("input", () => {
   userScrubbing = true;
-  renderer.seek(Number(scrubEl.value) / 1000);
+  const at = Number(scrubEl.value) / 1000;
+  renderer.seek(at);
+  for (const r of triRenderers.values()) r.seek(at);
 });
 scrubEl.addEventListener("change", () => {
   userScrubbing = false;
@@ -196,6 +275,7 @@ window.addEventListener("keydown", (e) => {
 
   if (e.key === "Escape") {
     if (performing) setPerforming(false);
+    else if (comparing) setComparing(false);
     else promptEl.blur();
     return;
   }
@@ -204,7 +284,10 @@ window.addEventListener("keydown", (e) => {
   switch (e.key.toLowerCase()) {
     case " ":
       e.preventDefault(); // don't scroll the page
-      renderer.togglePlay();
+      playPauseEl.click(); // one path, so the triptych stays in step
+      break;
+    case "c":
+      setComparing(!comparing);
       break;
     case "p":
       setPerforming(!performing);
@@ -224,8 +307,9 @@ window.addEventListener("keydown", (e) => {
 drawTree();
 generate();
 
-// ?perform=1 boots straight into performance mode — for plugging into a projector
-// without fumbling through the instrument chrome in front of a room.
-if (new URLSearchParams(location.search).has("perform")) {
-  setPerforming(true);
-}
+// Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
+// projector without fumbling through chrome in front of a room); ?compare=1 opens the
+// triptych.
+const boot = new URLSearchParams(location.search);
+if (boot.has("perform")) setPerforming(true);
+if (boot.has("compare")) setComparing(true);

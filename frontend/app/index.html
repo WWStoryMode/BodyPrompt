@@ -14,6 +14,7 @@
         <span class="brand"><b>Body</b>Prompt</span>
         <span class="tag">prompting as choreographic search</span>
         <span class="spacer"></span>
+        <button id="triptych" class="chip-btn" title="Compare models (C)">Compare</button>
         <button id="perform" class="chip-btn" title="Performance mode (P)">Perform</button>
         <span id="mode-pill" class="mode-pill">Search instrument · live</span>
       </div>
@@ -83,6 +84,45 @@
             </div>
           </div>
         </aside>
+      </div>
+
+      <!-- ===================================================================
+           TRIPTYCH — one prompt, three models, side by side.
+           Each model keeps its NATIVE way of authoring (write / voice / sculpt):
+           the difference in how you author is itself part of the research.
+           =================================================================== -->
+      <div id="tri" class="tri">
+        <div class="tri-banner">
+          <b>stub</b> — the three models differ here only because the stub hashes
+          <i>(model, prompt)</i>. These are <b>not</b> three models interpreting a theme.
+          The comparison becomes real when a model lands.
+        </div>
+        <div class="tri-cols">
+          <div class="tri-col" data-model="snapmogen">
+            <div class="tri-head">
+              <span class="tri-name">SnapMoGen</span>
+              <span class="tri-mode">write</span>
+            </div>
+            <div class="tri-stage" id="tri-stage-snapmogen"></div>
+            <div class="tri-foot" id="tri-foot-snapmogen">—</div>
+          </div>
+          <div class="tri-col" data-model="language-of-motion">
+            <div class="tri-head">
+              <span class="tri-name">Language of Motion</span>
+              <span class="tri-mode">voice</span>
+            </div>
+            <div class="tri-stage" id="tri-stage-language-of-motion"></div>
+            <div class="tri-foot" id="tri-foot-language-of-motion">—</div>
+          </div>
+          <div class="tri-col" data-model="kimodo">
+            <div class="tri-head">
+              <span class="tri-name">Kimodo</span>
+              <span class="tri-mode">sculpt</span>
+            </div>
+            <div class="tri-stage" id="tri-stage-kimodo"></div>
+            <div class="tri-foot" id="tri-foot-kimodo">—</div>
+          </div>
+        </div>
       </div>
 
       <div class="transport">
