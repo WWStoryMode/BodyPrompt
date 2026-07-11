@@ -8,6 +8,7 @@
 import "./style.css";
 import { StickFigureRenderer } from "./renderer";
 import { Lineage, renderTree } from "./lineage";
+import { renderFloorPath, renderNotationStrip } from "./notation";
 import type { CanonicalMotion } from "./types";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -29,6 +30,12 @@ const scrubEl = $<HTMLInputElement>("scrub");
 const counterEl = $<HTMLSpanElement>("counter");
 const ghostsEl = $<HTMLInputElement>("ghosts");
 const lineageSvgEl = document.getElementById("lineage-svg") as unknown as SVGSVGElement;
+const notationSvgEl = document.getElementById("notation-svg") as unknown as SVGSVGElement;
+const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElement;
+
+// The score is rebuilt once per motion; playback only moves these playheads.
+let setNotationFrame: ((frame: number) => void) | null = null;
+let setFloorFrame: ((frame: number) => void) | null = null;
 
 // ---- renderer + lineage ----
 const renderer = new StickFigureRenderer(stageEl);
@@ -55,6 +62,10 @@ function showMotion(motion: CanonicalMotion): void {
   renderer.load(motion);
   renderer.setGhostsVisible(ghostsEl.checked);
 
+  // rebuild the legible reduction for this motion
+  setNotationFrame = renderNotationStrip(notationSvgEl, motion);
+  setFloorFrame = renderFloorPath(floorSvgEl, motion);
+
   const ghostCount = motion.variants?.length ?? 0;
   telemetryEl.innerHTML =
     `<span class="k">model</span> ${motion.model}<br>` +
@@ -73,6 +84,9 @@ renderer.onFrame(({ frame, total, fps, playing }) => {
   if (!userScrubbing && total > 1) {
     scrubEl.value = String(Math.round((frame / (total - 1)) * 1000));
   }
+  // walk the "now" marker across the score and along the floor path
+  setNotationFrame?.(frame);
+  setFloorFrame?.(frame);
 });
 
 // ---- generate ----

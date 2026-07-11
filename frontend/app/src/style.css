@@ -141,6 +141,45 @@ html, body {
 .tree-node.current .tree-dot { fill: var(--accent); }
 .tree-node.current .tree-label { fill: var(--ink); }
 
+/* ---- notation rail (right) ---- */
+.rail-right {
+  width: 330px;
+  border-right: none;
+  border-left: 1px solid var(--line);
+}
+.nota-block { padding: 14px 14px 18px; border-bottom: 1px solid var(--line); }
+.nota-cap {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+.nota-key {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin-top: 8px;
+}
+
+/* the score */
+.nota-label { fill: var(--ink-faint); font-family: var(--mono); font-size: 9.5px; }
+.nota-baseline { stroke: var(--line); stroke-width: 1; }
+.nota-glyph { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+.nota-head { fill: var(--accent); }
+.nota-still { fill: var(--ink-faint); }
+.nota-now { stroke: var(--ghost); stroke-width: 1.4; opacity: 0.85; }
+
+/* the floor path */
+.floor-frame { fill: none; stroke: var(--line); }
+.floor-grid { stroke: var(--line); stroke-width: 1; opacity: 0.45; }
+.floor-trace { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+.floor-foot { fill: none; stroke: var(--ink-faint); stroke-width: 1; opacity: 0.55; }
+.floor-start { fill: none; stroke: var(--ink-dim); stroke-width: 1.4; }
+.floor-now { fill: var(--accent); }
+
 /* ---- stage ---- */
 .body { flex: 1; display: flex; min-height: 0; }
 .stage-view { flex: 1; position: relative; min-height: 0; }
