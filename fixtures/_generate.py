@@ -209,10 +209,13 @@ SLIP_AWAY = [
 ]
 
 # "coming home" — both arms sweep inward to the chest (gathering), a slight crouch.
+# The knee/ankle deltas compensate the pelvis drop so the feet stay planted (see FALL_AND_RISE).
 GATHER = [
     (0.00, {}),
     (0.50, {
         "pelvis": (0.0, -0.10, 0.0),
+        "left_knee": (0.0, 0.06, 0.04), "right_knee": (0.0, 0.06, 0.04),
+        "left_ankle": (0.0, 0.04, -0.04), "right_ankle": (0.0, 0.04, -0.04),
         "left_shoulder": (0.0, 0.0, 0.04), "right_shoulder": (0.0, 0.0, 0.04),
         "left_elbow": (-0.14, 0.14, 0.12), "right_elbow": (0.14, 0.14, 0.12),
         "left_wrist": (-0.30, 0.26, 0.16), "right_wrist": (0.30, 0.26, 0.16),
@@ -220,8 +223,61 @@ GATHER = [
     }),
     (1.00, {
         "pelvis": (0.0, -0.04, 0.0),
+        "left_knee": (0.0, 0.025, 0.015), "right_knee": (0.0, 0.025, 0.015),
+        "left_ankle": (0.0, 0.015, -0.015), "right_ankle": (0.0, 0.015, -0.015),
         "left_elbow": (-0.16, 0.16, 0.14), "right_elbow": (0.16, 0.16, 0.14),
         "left_wrist": (-0.36, 0.30, 0.18), "right_wrist": (0.36, 0.30, 0.18),
+    }),
+]
+
+# "the ground remembers" — a fold down toward the floor, then a rise.
+# NOTE: offsets propagate down the chain, so dropping the pelvis drags the legs with it.
+# The knee/ankle deltas below deliberately COMPENSATE (+y) so the feet stay planted:
+#   ankle total dy = pelvis(-0.45) + knee(+0.30) + ankle(+0.15) = 0  -> feet on the ground.
+FALL_AND_RISE = [
+    (0.00, {}),
+    (0.40, {
+        "pelvis": (0.0, -0.45, 0.05),
+        "left_knee": (0.0, 0.30, 0.18), "right_knee": (0.0, 0.30, 0.18),
+        "left_ankle": (0.0, 0.15, -0.18), "right_ankle": (0.0, 0.15, -0.18),
+        "spine3": (0.0, -0.02, 0.12), "head": (0.0, -0.05, 0.10),
+        "left_wrist": (0.0, -0.05, 0.15), "right_wrist": (0.0, -0.05, 0.15),
+    }),
+    (0.75, {  # rising — roughly 40% of the fold
+        "pelvis": (0.0, -0.18, 0.02),
+        "left_knee": (0.0, 0.12, 0.07), "right_knee": (0.0, 0.12, 0.07),
+        "left_ankle": (0.0, 0.06, -0.07), "right_ankle": (0.0, 0.06, -0.07),
+        "spine3": (0.0, -0.01, 0.05), "head": (0.0, -0.02, 0.04),
+        "left_wrist": (0.0, 0.0, 0.06), "right_wrist": (0.0, 0.0, 0.06),
+    }),
+    (1.00, {  # risen, a little taller than rest — opened out
+        "pelvis": (0.0, 0.03, 0.0),
+        "head": (0.0, 0.04, -0.02),
+        "left_wrist": (-0.04, 0.06, -0.02), "right_wrist": (0.04, 0.06, -0.02),
+    }),
+]
+
+# "look back, then go" — the torso twists and the head turns back over the shoulder,
+# one arm sweeping behind and one across the body, before the body turns away and leaves.
+TURN_AWAY = [
+    (0.00, {}),
+    (0.35, {
+        "spine2": (0.04, 0.0, 0.02), "spine3": (0.08, 0.0, 0.04),
+        "head": (0.12, 0.01, 0.06),  # looking back
+        "left_elbow": (-0.06, 0.06, -0.14), "left_wrist": (-0.10, 0.10, -0.28),
+        "right_elbow": (0.10, 0.08, 0.10), "right_wrist": (0.26, 0.12, 0.18),
+    }),
+    (0.65, {  # the look deepens, held
+        "spine2": (0.05, 0.0, 0.03), "spine3": (0.10, 0.0, 0.05),
+        "head": (0.15, 0.01, 0.08),
+        "left_elbow": (-0.07, 0.05, -0.17), "left_wrist": (-0.12, 0.08, -0.33),
+        "right_elbow": (0.11, 0.07, 0.12), "right_wrist": (0.29, 0.10, 0.21),
+    }),
+    (1.00, {  # unwinds and goes
+        "pelvis": (-0.10, 0.0, -0.06),
+        "spine3": (-0.02, 0.0, -0.02),
+        "head": (-0.04, 0.0, -0.04),
+        "left_wrist": (0.0, 0.0, -0.05), "right_wrist": (0.0, 0.0, -0.04),
     }),
 ]
 
@@ -229,6 +285,8 @@ FIXTURES = {
     "reach-and-return": ("a body remembers a place it cannot return to", "snapmogen", 4021, REACH_AND_RETURN),
     "slip-away":        ("slip away", "kimodo", 1177, SLIP_AWAY),
     "gather":           ("coming home", "language-of-motion", 8802, GATHER),
+    "fall-and-rise":    ("the ground remembers", "snapmogen", 5310, FALL_AND_RISE),
+    "turn-away":        ("look back, then go", "kimodo", 2287, TURN_AWAY),
 }
 
 
