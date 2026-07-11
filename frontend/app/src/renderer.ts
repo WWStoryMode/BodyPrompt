@@ -60,9 +60,11 @@ export class StickFigureRenderer {
     this.container = container;
     this.scene.background = new THREE.Color(STAGE_BG);
 
+    // Framed on the body, but with headroom: a raised arm reaches ~1.5m, so the view must
+    // still hold roughly 0 -> 2.5m or gestures get cropped off the top.
     const { clientWidth: w, clientHeight: h } = container;
-    this.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
-    this.camera.position.set(2.4, 1.5, 3.2);
+    this.camera = new THREE.PerspectiveCamera(46, w / h, 0.1, 100);
+    this.camera.position.set(2.0, 1.45, 2.9);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
@@ -70,7 +72,7 @@ export class StickFigureRenderer {
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 1.0, 0);
+    this.controls.target.set(0, 1.0, 0); // chest height — the body, not the floor
     this.controls.enableDamping = true;
     this.controls.update();
 
