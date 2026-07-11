@@ -143,21 +143,34 @@ class StubGenerator(Generator):
         if not self._fixtures:
             raise RuntimeError("no fixtures found; run `python3 fixtures/_generate.py`")
 
-        # Deterministic pick: same prompt -> same motion.
-        idx = (sum(ord(c) for c in prompt) if prompt else 0) % len(self._fixtures)
-        motion = dict(self._fixtures[idx])  # shallow copy — don't mutate the cache
+        # Deterministic pick, keyed on BOTH prompt and model: same (prompt, model) always
+        # gives the same motion, and the three models give three different ones.
+        #
+        # HONESTY: this makes the triptych have something to compare, but the differences
+        # are an ARBITRARY ARTEFACT OF HASHING — they are not three models interpreting a
+        # theme differently. Nothing here can be read as a finding about model behaviour.
+        # When a real model lands, these differences become real and this comment goes.
+        key = f"{model}:{prompt}"
+        idx = (sum(ord(c) for c in key) if key else 0) % len(self._fixtures)
+        base = self._fixtures[idx]
+
+        # There are only a handful of fixtures, so two models can hash to the same one and
+        # would then render identically — a triptych of twins. Give each model a stable
+        # signature and vary the motion by it, so the three panels always differ.
+        model_sig = sum(ord(c) for c in model) * 7919 if model else 0
+        seed = int(base.get("seed", 0)) + model_sig
+        motion = vary(base, seed) if model_sig else dict(base)
 
         # Echo back what the caller asked for; flag honestly that no model ran.
-        motion["prompt"] = prompt or motion.get("prompt", "")
-        motion["model"] = model or motion.get("model", "")
+        motion["prompt"] = prompt or base.get("prompt", "")
+        motion["model"] = model or base.get("model", "")
         motion["stub"] = True
 
         # The ghost-cloud: siblings of this motion, one per extra seed. Seeds are derived
-        # from the base seed, so the same prompt always yields the same cloud.
+        # from this motion's seed, so the same (prompt, model) always yields the same cloud.
         if variants > 1:
-            base_seed = int(motion.get("seed", 0))
             motion["variants"] = [
-                vary(motion, base_seed + 1000 * i) for i in range(1, variants)
+                vary(motion, seed + 1000 * i) for i in range(1, variants)
             ]
         return motion
 

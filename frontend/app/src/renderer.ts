@@ -33,8 +33,18 @@ export type FrameListener = (info: {
   playing: boolean;
 }) => void;
 
+/** Options per renderer instance — the triptych colour-codes one panel per model. */
+export interface RendererOptions {
+  /** Figure colour. Defaults to the house amber. */
+  accent?: number;
+  /** Hide the ground grid — useful in the triptych's small panels. */
+  grid?: boolean;
+}
+
 export class StickFigureRenderer {
   private container: HTMLElement;
+  private accent: number;
+  private boneColor: number;
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
@@ -61,8 +71,11 @@ export class StickFigureRenderer {
   // the stage itself: a lab bench is lit for inspection, a performance is lit for a room
   private grid?: THREE.GridHelper;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, opts: RendererOptions = {}) {
     this.container = container;
+    this.accent = opts.accent ?? ACCENT;
+    // bones sit slightly softer than the joints, whatever the accent is
+    this.boneColor = opts.accent === undefined ? BONE : opts.accent;
     this.scene.background = new THREE.Color(STAGE_BG);
 
     // Framed on the body, but with headroom: a raised arm reaches ~1.5m, so the view must
@@ -82,11 +95,13 @@ export class StickFigureRenderer {
     this.controls.update();
 
     // ground grid (the "floor" the figure stands on)
-    const grid = new THREE.GridHelper(6, 12, GRID, GRID);
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.5;
-    this.scene.add(grid);
-    this.grid = grid;
+    if (opts.grid !== false) {
+      const grid = new THREE.GridHelper(6, 12, GRID, GRID);
+      (grid.material as THREE.Material).transparent = true;
+      (grid.material as THREE.Material).opacity = 0.5;
+      this.scene.add(grid);
+      this.grid = grid;
+    }
 
     // keep the canvas matched to its container
     const ro = new ResizeObserver(() => this.onResize());
@@ -217,7 +232,7 @@ export class StickFigureRenderer {
     // joints
     const jointGeo = new THREE.SphereGeometry(0.022, 12, 12);
     const landmarkGeo = new THREE.SphereGeometry(0.038, 14, 14);
-    const jointMat = new THREE.MeshBasicMaterial({ color: ACCENT });
+    const jointMat = new THREE.MeshBasicMaterial({ color: this.accent });
     for (let i = 0; i < motion.joints.length; i++) {
       const geo = landmarkIdx.has(i) ? landmarkGeo : jointGeo;
       const mesh = new THREE.Mesh(geo, jointMat);
@@ -234,7 +249,7 @@ export class StickFigureRenderer {
     boneGeo.setAttribute("position", this.bonePositions);
     this.boneLines = new THREE.LineSegments(
       boneGeo,
-      new THREE.LineBasicMaterial({ color: BONE }),
+      new THREE.LineBasicMaterial({ color: this.boneColor }),
     );
     this.scene.add(this.boneLines);
 
@@ -246,7 +261,7 @@ export class StickFigureRenderer {
       for (let k = 0; k < TRAIL_LEN; k++) {
         const opacity = 0.5 * (1 - k / TRAIL_LEN);
         const mat = new THREE.MeshBasicMaterial({
-          color: ACCENT,
+          color: this.accent,
           transparent: true,
           opacity,
         });
