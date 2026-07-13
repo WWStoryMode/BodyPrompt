@@ -187,8 +187,11 @@ function setReading(on: boolean): void {
 // score. Slowed down, because a human has to be able to follow and re-embody it.
 
 const TEMPOS = [0.5, 0.25, 1]; // performance opens at half speed; T cycles
+const FULL_SPEED = TEMPOS.indexOf(1);
 let performing = false;
-let tempoIdx = 0;
+// Where T picks up from. The bench plays at full speed, so it starts here and the first
+// press steps to 0.5x; performance mode re-seats it at 0.5x (index 0) when it opens.
+let tempoIdx = FULL_SPEED;
 
 function setTempo(rate: number): void {
   renderer.setTempo(rate);
@@ -205,11 +208,12 @@ function setPerforming(on: boolean): void {
   scoreTitleEl.textContent = on ? "the score · for the body" : "notation · the score";
 
   if (on) {
-    tempoIdx = 0;
+    tempoIdx = 0; // performance opens at half speed — a body has to be able to follow it
     setTempo(TEMPOS[tempoIdx]);
     renderer.play();
   } else {
-    setTempo(1);
+    tempoIdx = FULL_SPEED;
+    setTempo(TEMPOS[tempoIdx]);
   }
 }
 
