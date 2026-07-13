@@ -92,9 +92,9 @@ The five screens in this repo are **mockups of research instruments**, each answ
 "how does this help the search?" — not "what feature is this?"
 
 ***All five screens now exist as a real, running app*** on stub data — the Lab Bench, the
-prompt-lineage tree, the variance ghost-cloud, the notation strip, the floor path, the
-multi-model triptych, and performance mode. See [Run it](#run-it) and Status. The mockups
-below are kept as the original statement of intent.
+prompt-lineage tree, the variance ghost-cloud, all four notation registers, the multi-model
+triptych, and performance mode. See [Run it](#run-it) and Status. The mockups below are kept
+as the original statement of intent.
 
 | # | Instrument | What it lets the research do |
 |---|-----------|------------------------------|
@@ -160,7 +160,7 @@ in front of an audience:
 | **v0** | Research proposition + mock interfaces | ✓ done |
 | **v0.5** | First functional slice — the search loop runs on **stub** data (schema + renderer + service, no ML) | ✓ done |
 | **v2** | **Prompt lineage** — the branching search retained and navigable | ✓ done |
-| **v2.5** | **Variance** (ghost-cloud) + **notation registers** (score + floor path) | ✓ done |
+| **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — a real model behind the service (needs weights + a GPU) | **next — everything now waits on this** |
@@ -191,9 +191,10 @@ spine of it (everything except the models):
   bones, trails, orbit camera), with the variance **ghost-cloud** overlaid.
   → [`frontend/app/`](frontend/app/).
 - ✓ **The research instruments** — the **prompt-lineage tree** (every revision branches
-  rather than replacing), and the **legible reduction**: a per-limb notation strip (angle =
-  direction, length = how far, height = level) and a top-down floor path, both derived from
-  the joint trajectories. → [`src/lineage.ts`](frontend/app/src/lineage.ts),
+  rather than replacing), and the **legible reduction**: four notation registers — a Marey
+  chronophotograph, a per-limb notation strip, a top-down floor path, and a Laban-inspired
+  score — all derived from the joint trajectories, none of them complete on its own.
+  → [`src/lineage.ts`](frontend/app/src/lineage.ts),
   [`src/notation.ts`](frontend/app/src/notation.ts).
 - ◐ **Inference service** (FastAPI) — `POST /generate {model, prompt} → canonical motion`.
   Live as a **fixture stub** (no ML) so the search loop is real before any weights load.
@@ -235,6 +236,28 @@ Open <http://localhost:5173>, type a phrase, click **Generate** — a 3D stick f
 animates; drag to orbit, use play/pause and the scrub bar. To re-author the motions, edit
 and re-run `python3 fixtures/_generate.py`.
 
+### Reading it
+
+Hit **Read** (or press <kbd>R</kbd>) for the four **notation registers** — the same motion
+made legible four ways at once:
+
+1. **Chronophotograph** — Marey's plate: successive poses fading from past to present, so
+   the whole phrase is visible at once instead of streaming past.
+2. **Notation strip** — a time-scored staff, one row per limb (angle = direction, length =
+   how far, height in the row = level).
+3. **Floor path** — the movement from above: the weight's trace, the feet faint behind it.
+4. **Laban-inspired score** — a vertical staff read bottom → top, with a central **support**
+   column (which foot bears the weight) and gesture columns for the body's own left and
+   right. Fill = level (solid low · hatched middle · hollow high), lean = sideways, width =
+   how far. It is a *designed reduction*, **not strict Labanotation** — designing that
+   reduction is itself part of the research.
+
+**No register is complete, and that is the point.** Each one throws information away, and
+*which* thing it throws away is the argument: the floor path cannot show you a raised arm;
+the chronophotograph drops the body's travel; the Laban score leaves forward/back to the
+floor path. Reading them together — and noticing what falls between them — is the
+instrument.
+
 ### Performing it
 
 Hit **Perform** (or press <kbd>P</kbd>) for the projectable stage: the instrument chrome
@@ -244,6 +267,7 @@ room. <http://localhost:5173/?perform=1> boots straight into it, for plugging in
 
 | key | |
 |---|---|
+| <kbd>R</kbd> | read the four notation registers |
 | <kbd>C</kbd> | compare models (the triptych) |
 | <kbd>P</kbd> | enter / leave performance mode |
 | <kbd>space</kbd> | play / pause |
@@ -251,7 +275,7 @@ room. <http://localhost:5173/?perform=1> boots straight into it, for plugging in
 | <kbd>G</kbd> | ghost-cloud on / off |
 | <kbd>esc</kbd> | leave the current mode |
 
-`?compare=1` opens the triptych directly.
+`?compare=1` opens the triptych directly; `?registers=1` opens the notation registers.
 
 The original static mockups need no build — just `open frontend/mockups/index.html`.
 
@@ -261,8 +285,9 @@ The original static mockups need no build — just `open frontend/mockups/index.
 
 Working today: type a phrase → a 3D stick figure moves; every prompt branches into a
 **lineage tree** (nothing is overwritten); one prompt shows **many seeds** as a variance
-**ghost-cloud**; and the motion is reduced to a readable **notation strip** and **floor
-path**. A pluggable `Generator` backend sits ready for a real model.
+**ghost-cloud**; and the motion is reduced to four readable **notation registers** — a Marey
+**chronophotograph**, a **notation strip**, a **floor path**, and a **Laban-inspired score**.
+A pluggable `Generator` backend sits ready for a real model.
 
 Also working: the **multi-model triptych** (one prompt, three models side by side, each
 keeping its native way of authoring) and **performance mode** (the projectable stage).
