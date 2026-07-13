@@ -8,7 +8,12 @@
 import "./style.css";
 import { StickFigureRenderer } from "./renderer";
 import { Lineage, renderTree } from "./lineage";
-import { renderFloorPath, renderNotationStrip } from "./notation";
+import {
+  renderChronophotograph,
+  renderFloorPath,
+  renderLabanScore,
+  renderNotationStrip,
+} from "./notation";
 import type { CanonicalMotion } from "./types";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -35,14 +40,23 @@ const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElem
 const appEl = $<HTMLDivElement>("app");
 const performEl = $<HTMLButtonElement>("perform");
 const triptychEl = $<HTMLButtonElement>("triptych");
+const registersBtnEl = $<HTMLButtonElement>("registers-btn");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
 const scoreTitleEl = $<HTMLDivElement>("score-title");
 
+// the 2×2 registers view — the same motion, made legible four ways at once
+const svg = (id: string) => document.getElementById(id) as unknown as SVGSVGElement;
+const regChronoSvgEl = svg("reg-chrono-svg");
+const regStripSvgEl = svg("reg-strip-svg");
+const regFloorSvgEl = svg("reg-floor-svg");
+const regLabanSvgEl = svg("reg-laban-svg");
+
 // The score is rebuilt once per motion; playback only moves these playheads.
-let setNotationFrame: ((frame: number) => void) | null = null;
-let setFloorFrame: ((frame: number) => void) | null = null;
+let playheads: ((frame: number) => void)[] = [];
+let current: CanonicalMotion | null = null;
+let lastFrame = 0;
 
 // ---- renderer + lineage ----
 const renderer = new StickFigureRenderer(stageEl);
@@ -117,11 +131,53 @@ async function generateTriptych(): Promise<void> {
 }
 
 function setComparing(on: boolean): void {
+  if (on && reading) setReading(false); // both take the whole stage — only one at a time
   comparing = on;
   appEl.classList.toggle("comparing", on);
   triptychEl.textContent = on ? "Close" : "Compare";
   modePillEl.textContent = on ? "Triptych · three models" : "Search instrument · live";
   if (on) generateTriptych();
+}
+
+// ---- the notation registers ----
+//
+// The right-hand rail always carries two registers, small. The registers VIEW opens all
+// four, large: chronophotograph, strip, floor path, Laban-inspired score. No register is
+// complete on its own — what each one drops is the point, and you read them together.
+
+let reading = false;
+
+/**
+ * Rebuild every register from the current motion, and re-seat the playheads.
+ * The registers view is only drawn while it is open — four more SVGs is not free, and it
+ * is closed most of the time.
+ */
+function buildScore(): void {
+  if (!current) return;
+  playheads = [
+    renderNotationStrip(notationSvgEl, current),
+    renderFloorPath(floorSvgEl, current),
+  ];
+  if (reading) {
+    playheads.push(
+      renderChronophotograph(regChronoSvgEl, current),
+      renderNotationStrip(regStripSvgEl, current),
+      renderFloorPath(regFloorSvgEl, current),
+      renderLabanScore(regLabanSvgEl, current),
+    );
+  }
+  // the renderer only emits while playing, so a score built during a pause would sit at
+  // frame 0 until you hit play — put the playheads where the body actually is
+  for (const set of playheads) set(lastFrame);
+}
+
+function setReading(on: boolean): void {
+  if (on && comparing) setComparing(false); // only one full-stage view at a time
+  reading = on;
+  appEl.classList.toggle("reading", on);
+  registersBtnEl.textContent = on ? "Close" : "Read";
+  modePillEl.textContent = on ? "Notation registers · four ways" : "Search instrument · live";
+  buildScore();
 }
 
 // ---- performance mode ----
@@ -167,12 +223,12 @@ function cycleTempo(): void {
 // restores that node's cloud too.
 function showMotion(motion: CanonicalMotion): void {
   hintEl.classList.add("hidden");
+  current = motion;
   renderer.load(motion);
   renderer.setGhostsVisible(ghostsEl.checked);
 
   // rebuild the legible reduction for this motion
-  setNotationFrame = renderNotationStrip(notationSvgEl, motion);
-  setFloorFrame = renderFloorPath(floorSvgEl, motion);
+  buildScore();
 
   // the phrase the room is watching the body search for
   perfPhraseEl.textContent = `“${motion.prompt}”`;
@@ -190,14 +246,14 @@ function showMotion(motion: CanonicalMotion): void {
 }
 
 renderer.onFrame(({ frame, total, fps, playing }) => {
+  lastFrame = frame;
   playPauseEl.textContent = playing ? "Pause" : "Play";
   counterEl.textContent = `frame ${frame} / ${total - 1}  ·  ${fps} fps`;
   if (!userScrubbing && total > 1) {
     scrubEl.value = String(Math.round((frame / (total - 1)) * 1000));
   }
-  // walk the "now" marker across the score and along the floor path
-  setNotationFrame?.(frame);
-  setFloorFrame?.(frame);
+  // walk the "now" marker through every open register
+  for (const set of playheads) set(frame);
 });
 
 // ---- generate ----
@@ -247,6 +303,7 @@ promptEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter") generateHere();
 });
 triptychEl.addEventListener("click", () => setComparing(!comparing));
+registersBtnEl.addEventListener("click", () => setReading(!reading));
 
 playPauseEl.addEventListener("click", () => {
   renderer.togglePlay();
@@ -276,6 +333,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (performing) setPerforming(false);
     else if (comparing) setComparing(false);
+    else if (reading) setReading(false);
     else promptEl.blur();
     return;
   }
@@ -288,6 +346,9 @@ window.addEventListener("keydown", (e) => {
       break;
     case "c":
       setComparing(!comparing);
+      break;
+    case "r":
+      setReading(!reading);
       break;
     case "p":
       setPerforming(!performing);
@@ -309,7 +370,8 @@ generate();
 
 // Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
 // projector without fumbling through chrome in front of a room); ?compare=1 opens the
-// triptych.
+// triptych; ?registers=1 opens the four notation registers.
 const boot = new URLSearchParams(location.search);
 if (boot.has("perform")) setPerforming(true);
 if (boot.has("compare")) setComparing(true);
+if (boot.has("registers")) setReading(true);

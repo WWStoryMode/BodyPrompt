@@ -172,6 +172,26 @@ html, body {
 .nota-still { fill: var(--ink-faint); }
 .nota-now { stroke: var(--ghost); stroke-width: 1.4; opacity: 0.85; }
 
+/* the chronophotograph — successive exposures, the newest solid, the oldest nearly gone */
+.chrono-ground { stroke: var(--line); stroke-width: 1; }
+.chrono-bone { stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; }
+.chrono-head { fill: var(--accent); }
+/* the exposure the playback is standing in (CSS beats the opacity attribute) */
+.chrono-pose.now { opacity: 1; }
+.chrono-pose.now .chrono-bone { stroke-width: 3.2; }
+
+/* the Laban-inspired score */
+.laban-beat { stroke: var(--line); stroke-width: 1; opacity: 0.6; }
+.laban-staff { stroke: var(--ink-faint); stroke-width: 1.4; }
+.laban-glyph { stroke: var(--accent); stroke-width: 1.4; }
+.laban-hatch-line { stroke: var(--accent); stroke-width: 1.4; }
+.laban-label {
+  fill: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+.laban-now { stroke: var(--ghost); stroke-width: 1.4; opacity: 0.85; }
+
 /* the floor path */
 .floor-frame { fill: none; stroke: var(--line); }
 .floor-grid { stroke: var(--line); stroke-width: 1; opacity: 0.45; }
@@ -392,6 +412,65 @@ html, body {
 .tri-col[data-model="kimodo"] .tri-name,
 .tri-col[data-model="kimodo"] .tri-mode { color: #74a7c8; }
 .tri-col[data-model="kimodo"] .tri-mode { border-color: rgba(116, 167, 200, 0.4); }
+
+/* =========================================================================
+   NOTATION REGISTERS — the 2×2, hidden until #app.reading. The right-hand rail
+   already carries two of these small; this is all four, large enough to read.
+   ========================================================================= */
+
+.reg { display: none; }
+#app.reading .body { display: none; }
+#app.reading .reg {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: var(--line); /* the gap IS the gridline */
+}
+/* the ghost-cloud is about seeds; these registers read ONE motion */
+#app.reading .toggle { display: none; }
+
+.reg-quad {
+  background: var(--stage-2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 18px 12px;
+}
+.reg-quad h3 {
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.reg-sub {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  margin-bottom: 10px;
+}
+.reg-sub b { color: var(--accent); font-weight: 600; }
+.reg-plot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+.reg-plot svg { max-height: 100%; max-width: 100%; }
+.reg-key {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  margin-top: 8px;
+}
+.reg-key b { color: var(--ink-dim); font-weight: 600; }
 
 /* ---- transport ---- */
 .transport {

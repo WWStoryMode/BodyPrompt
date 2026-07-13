@@ -14,6 +14,7 @@
         <span class="brand"><b>Body</b>Prompt</span>
         <span class="tag">prompting as choreographic search</span>
         <span class="spacer"></span>
+        <button id="registers-btn" class="chip-btn" title="Notation registers (R)">Read</button>
         <button id="triptych" class="chip-btn" title="Compare models (C)">Compare</button>
         <button id="perform" class="chip-btn" title="Performance mode (P)">Perform</button>
         <span id="mode-pill" class="mode-pill">Search instrument · live</span>
@@ -121,6 +122,72 @@
             </div>
             <div class="tri-stage" id="tri-stage-kimodo"></div>
             <div class="tri-foot" id="tri-foot-kimodo">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================
+           NOTATION REGISTERS — the same motion made legible four ways at once.
+           No register is complete on its own; what each one DROPS is the point.
+           References: Marey & Muybridge, Labanotation, Eshkol-Wachman.
+           =================================================================== -->
+      <div id="registers" class="reg">
+        <div class="reg-quad">
+          <h3>1 · Line-figure</h3>
+          <div class="reg-sub">
+            a <b>Marey chronophotograph</b> — successive poses fading in time; movement as
+            its own notation
+          </div>
+          <div class="reg-plot">
+            <svg id="reg-chrono-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="reg-key">
+            across = <b>time</b>, not distance (Marey's moving plate) · each pose centred on
+            its own weight — travel is register 3's job · seen from a quarter-turn, so the
+            legs don't collapse onto one line · lit pose = now
+          </div>
+        </div>
+
+        <div class="reg-quad">
+          <h3>2 · Notation strip</h3>
+          <div class="reg-sub">
+            per-limb tracks with <b>direction / level glyphs</b> over time — legible enough
+            to re-perform from
+          </div>
+          <div class="reg-plot">
+            <svg id="reg-strip-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="reg-key">
+            angle = direction · length = how far · height in row = level
+          </div>
+        </div>
+
+        <div class="reg-quad">
+          <h3>3 · Floor path</h3>
+          <div class="reg-sub">
+            top-down spatial trace of where the body <b>travels</b> — the weight's line,
+            the feet faint behind it
+          </div>
+          <div class="reg-plot">
+            <svg id="reg-floor-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="reg-key">
+            never zoomed past 0.7 m — a body that barely travels looks like one
+          </div>
+        </div>
+
+        <div class="reg-quad">
+          <h3>4 · Laban-inspired score</h3>
+          <div class="reg-sub">
+            a designed reduction (<b>not strict Labanotation</b>) — read bottom → top;
+            columns are the <b>body's own</b> left and right
+          </div>
+          <div class="reg-plot">
+            <svg id="reg-laban-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="reg-key">
+            centre = <b>support</b> (which foot bears weight) · fill = level (solid low ·
+            hatched middle · hollow high) · lean = sideways · width = how far
           </div>
         </div>
       </div>
