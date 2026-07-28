@@ -143,13 +143,15 @@ building the instrument first was worth doing:
 
 ## Retiring the fakes
 
-Every one of them dies at v1, and they die together — that is the point of having built it
-this way. One backend that returns joints instead of a fixture, and:
+The v1 Kimodo backend retires the prompt hash, synthetic variance and empty rotations **for
+outputs whose provenance says `source: kimodo`**. The explicitly labelled SnapMoGen and
+Language of Motion fixtures keep those stand-ins. The triptych cannot become a real
+three-model comparison until it has three real providers.
 
 | Fake | Retired by |
 |---|---|
 | #1 the prompt hash | the model reading the prompt |
-| #2 the triptych's model signature | three actual models |
+| #2 the triptych's model signature | three actual models — not completed by single-model v1 |
 | #3 the ghost-cloud perturbation | asking the model for *n* samples |
 | #4 identity rotations | a model that emits them |
 

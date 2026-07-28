@@ -20,6 +20,13 @@ export interface CanonicalMotion {
   prompt: string;
   model: string;
   seed: number;
+  /** Additive v1 truth about where this motion actually came from. */
+  provenance?: {
+    source: "kimodo" | "fixture";
+    backend: string;
+    model_version: string;
+    inference_ms: number;
+  };
   /** True when the motion came from the v0 stub rather than a model. */
   stub?: boolean;
   /**

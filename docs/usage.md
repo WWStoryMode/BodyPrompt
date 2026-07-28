@@ -232,7 +232,7 @@ The service loads fixtures at startup, so restart it after re-compiling.
 The generator behind `POST /generate` is chosen by an environment variable:
 
 ```bash
-BODYPROMPT_BACKEND=stub uv run uvicorn app.main:app --port 8000   # the default; the only one that exists
+BODYPROMPT_BACKEND=stub uv run uvicorn app.main:app --port 8000   # fixtures; no GPU
 ```
 
 A real backend implements `Generator` (`name`, `ml`, `ready()`, `generate(model, prompt,
@@ -240,3 +240,21 @@ variants)`), returns canonical motion, and registers itself in `_BACKENDS`. **No
 the system changes** — not the frontend, not the renderer, not one of the four registers. That
 is the whole reason v0 was built in this order. See
 [`motion-schema.md`](motion-schema.md) for the format a backend must emit.
+
+## Running the v1 Kimodo backend (in development)
+
+The v1 branch isolates Kimodo in a CUDA worker so the main service stays runnable on a
+non-CUDA machine. Copy `.env.example` to `.env`, set `BODYPROMPT_BACKEND=kimodo`, provide a
+fine-grained Hugging Face read token as `HF_TOKEN`, then run:
+
+```bash
+docker compose --profile local-gpu up --build
+```
+
+The operator must first request access to `meta-llama/Meta-Llama-3-8B-Instruct` on Hugging
+Face. The token is a secret: do not commit it. With 8–16 GB VRAM the worker keeps Kimodo on
+CUDA and places its text encoder on CPU.
+
+This path is not considered complete until the GPU checks in
+[`v1-implementation.md`](v1-implementation.md) pass. In every mode, `/health` and the model
+selector state whether an output is real, a fixture, or unavailable.

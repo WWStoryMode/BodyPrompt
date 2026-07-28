@@ -1,0 +1,30 @@
+services:
+  service:
+    build:
+      context: .
+      dockerfile: service/Dockerfile
+    environment:
+      BODYPROMPT_BACKEND: ${BODYPROMPT_BACKEND:-stub}
+      BODYPROMPT_KIMODO_URL: http://kimodo-worker:8010
+    ports:
+      - "8000:8000"
+
+  kimodo-worker:
+    profiles: ["local-gpu"]
+    build: ./inference/kimodo-worker
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      TEXT_ENCODER_DEVICE: cpu
+      BODYPROMPT_DIFFUSION_STEPS: ${BODYPROMPT_DIFFUSION_STEPS:-100}
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  huggingface-cache:

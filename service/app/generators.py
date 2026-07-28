@@ -5,11 +5,10 @@ One interface, many implementations. The API contract and the whole frontend nev
 change; only the thing that *produces* the canonical motion swaps out, selected by the
 `BODYPROMPT_BACKEND` environment variable (default: "stub").
 
-Today only the no-ML `StubGenerator` exists. Future backends slot in here as their own
-small classes, each returning the same canonical motion (bodyprompt.motion/v0):
-
-    - "cloud"  -> CloudGenerator   (calls a hosted model API, e.g. Replicate/Modal)
-    - "local"  -> LocalGpuGenerator (loads weights, runs on a CUDA GPU)
+The default remains the no-ML `StubGenerator`. The v1 "kimodo" backend is deliberately an
+HTTP boundary: this small service stays usable without CUDA, while a local Docker worker
+owns Kimodo's large model/runtime. Pointing the same boundary at another machine later does
+not change the browser or the canonical motion contract.
 
 See docs/motion-schema.md for the format every generator must emit.
 """
@@ -21,6 +20,9 @@ import math
 import os
 import pathlib
 import random
+import secrets
+import time
+from urllib import error, request
 
 # fixtures/ lives at the repo root: service/app/generators.py -> ../../fixtures
 FIXTURES_DIR = pathlib.Path(__file__).resolve().parents[2] / "fixtures"
@@ -103,7 +105,18 @@ class Generator:
         """Is this backend usable right now (fixtures present, API key set, GPU up)?"""
         return True
 
-    def generate(self, model: str, prompt: str, variants: int = 1) -> dict:
+    def capabilities(self) -> list[dict]:
+        """Describe which model labels are real and which are still fixtures."""
+        return []
+
+    def generate(
+        self,
+        model: str,
+        prompt: str,
+        variants: int = 1,
+        duration_seconds: float = 5.0,
+        seed: int | None = None,
+    ) -> dict:
         """
         Return a canonical motion. When `variants` > 1, the motion also carries a
         `variants` list of siblings (same prompt, different seeds) for the ghost-cloud.
@@ -135,11 +148,24 @@ class StubGenerator(Generator):
     def ready(self) -> bool:
         return len(self._fixtures) > 0
 
+    def capabilities(self) -> list[dict]:
+        return [
+            {"model": model, "source": "fixture", "ready": self.ready()}
+            for model in ("snapmogen", "language-of-motion", "kimodo")
+        ]
+
     @property
     def count(self) -> int:
         return len(self._fixtures)
 
-    def generate(self, model: str, prompt: str, variants: int = 1) -> dict:
+    def generate(
+        self,
+        model: str,
+        prompt: str,
+        variants: int = 1,
+        duration_seconds: float = 5.0,
+        seed: int | None = None,
+    ) -> dict:
         if not self._fixtures:
             raise RuntimeError("no fixtures found; run `python3 fixtures/_generate.py`")
 
@@ -165,6 +191,12 @@ class StubGenerator(Generator):
         motion["prompt"] = prompt or base.get("prompt", "")
         motion["model"] = model or base.get("model", "")
         motion["stub"] = True
+        motion["provenance"] = {
+            "source": "fixture",
+            "backend": self.name,
+            "model_version": "bodyprompt-fixtures/v0",
+            "inference_ms": 0,
+        }
 
         # The ghost-cloud: siblings of this motion, one per extra seed. Seeds are derived
         # from this motion's seed, so the same (prompt, model) always yields the same cloud.
@@ -175,17 +207,96 @@ class StubGenerator(Generator):
         return motion
 
 
-# Registry of known backends. Add cloud/local here as they land.
-_BACKENDS = {
-    "stub": StubGenerator,
-}
+class KimodoGenerator(Generator):
+    """
+    Hybrid v1 backend: Kimodo is real; the other named models remain honest fixtures.
+
+    The worker returns canonical motion rather than model-native tensors. That keeps the
+    SOMA adapter beside the model version it understands and makes this boundary equally
+    usable for a local Compose worker or, later, a remote GPU.
+    """
+
+    name = "kimodo"
+    ml = True
+    model_version = "Kimodo-SOMA-RP-v1.1"
+
+    def __init__(self) -> None:
+        self._stub = StubGenerator()
+        self._url = os.environ.get("BODYPROMPT_KIMODO_URL", "http://127.0.0.1:8010").rstrip("/")
+        self._timeout = float(os.environ.get("BODYPROMPT_INFERENCE_TIMEOUT", "120"))
+
+    def _json(self, path: str, payload: dict | None = None) -> dict:
+        body = None if payload is None else json.dumps(payload).encode()
+        req = request.Request(
+            f"{self._url}{path}",
+            data=body,
+            headers={"content-type": "application/json"},
+            method="GET" if body is None else "POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self._timeout) as response:
+                return json.load(response)
+        except error.HTTPError as err:
+            try:
+                detail = json.load(err).get("detail", str(err))
+            except (json.JSONDecodeError, AttributeError):
+                detail = str(err)
+            raise RuntimeError(f"Kimodo worker rejected generation: {detail}") from err
+        except (error.URLError, TimeoutError) as err:
+            raise RuntimeError(f"Kimodo worker unavailable at {self._url}: {err}") from err
+
+    def ready(self) -> bool:
+        try:
+            return bool(self._json("/health").get("ready"))
+        except RuntimeError:
+            return False
+
+    def capabilities(self) -> list[dict]:
+        return [
+            {"model": "kimodo", "source": "kimodo", "ready": self.ready()},
+            {"model": "snapmogen", "source": "fixture", "ready": self._stub.ready()},
+            {"model": "language-of-motion", "source": "fixture", "ready": self._stub.ready()},
+        ]
+
+    def generate(
+        self,
+        model: str,
+        prompt: str,
+        variants: int = 1,
+        duration_seconds: float = 5.0,
+        seed: int | None = None,
+    ) -> dict:
+        if model != "kimodo":
+            return self._stub.generate(model, prompt, variants, duration_seconds, seed)
+
+        chosen_seed = seed if seed is not None else secrets.randbelow(2**31)
+        started = time.perf_counter()
+        motion = self._json(
+            "/generate",
+            {
+                "prompt": prompt,
+                "duration_seconds": duration_seconds,
+                "variants": variants,
+                "seed": chosen_seed,
+            },
+        )
+        motion["prompt"] = prompt  # the worker may never rewrite the researcher's phrase
+        motion["model"] = "kimodo"
+        motion["stub"] = False
+        motion["provenance"] = {
+            "source": "kimodo",
+            "backend": self.name,
+            "model_version": self.model_version,
+            "inference_ms": round((time.perf_counter() - started) * 1000),
+        }
+        return motion
 
 
 def make_generator() -> Generator:
     """Build the generator named by BODYPROMPT_BACKEND (default 'stub')."""
     backend = os.environ.get("BODYPROMPT_BACKEND", "stub").lower()
-    factory = _BACKENDS.get(backend)
+    factory = {"stub": StubGenerator, "kimodo": KimodoGenerator}.get(backend)
     if factory is None:
-        known = ", ".join(sorted(_BACKENDS))
+        known = "kimodo, stub"
         raise ValueError(f"unknown BODYPROMPT_BACKEND={backend!r} (known: {known})")
     return factory()

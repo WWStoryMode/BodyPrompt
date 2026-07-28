@@ -1,9 +1,9 @@
 {
   "name": "bodyprompt-app",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
-  "description": "BodyPrompt — minimal Vite + three.js app. The Lab Bench, functional (stub data, no ML).",
+  "description": "BodyPrompt — choreographic search across real and fixture motion providers.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -87,6 +87,25 @@ html, body {
   font-size: 13px;
   padding: 10px 12px;
 }
+.duration {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.duration .model-select { min-width: 68px; }
+.generation-status {
+  min-width: 72px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.generation-status.busy { color: var(--accent); }
+.generation-status.error { color: #df8a7d; }
 .btn {
   background: var(--accent);
   color: #14140f;
