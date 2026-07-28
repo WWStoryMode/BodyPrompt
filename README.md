@@ -203,11 +203,14 @@ spine of it (everything except the models):
 - ✗ **A model behind the service** — the v1 step; needs weights + likely a GPU. *Not built.*
 
 ```
-fixtures/            canonical motion JSON (hand-authored) + generator
+fixtures/              canonical motion JSON (hand-authored) + generator
+docs/abstract.md       the accepted abstract — the canonical framing
 docs/motion-schema.md  the exchange-format spec
-service/             FastAPI /generate stub (uv)
-frontend/app/        Vite + three.js Lab Bench (the live screen)
-frontend/mockups/    the original static mockups (reference)
+docs/usage.md          how to use the tool — every view, control and shortcut
+docs/v0-stub.md        what v0 fakes — the complete honesty inventory
+service/               FastAPI /generate stub (uv)
+frontend/app/          Vite + three.js Lab Bench (the live screen)
+frontend/mockups/      the original static mockups (reference)
 ```
 
 **Stack:** three.js + TypeScript + Vite (frontend, pnpm); Python + FastAPI (service, uv);
@@ -235,6 +238,9 @@ pnpm dev
 Open <http://localhost:5173>, type a phrase, click **Generate** — a 3D stick figure
 animates; drag to orbit, use play/pause and the scrub bar. To re-author the motions, edit
 and re-run `python3 fixtures/_generate.py`.
+
+📖 **[`docs/usage.md`](docs/usage.md) is the full guide** — every view, every control, every
+keyboard shortcut, and how to read each of the four notation registers.
 
 ### Reading it
 
@@ -300,6 +306,13 @@ keeping its native way of authoring) and **performance mode** (the projectable s
 - In the **triptych**, the three models differ *only because the stub hashes `(model, prompt)`*.
   **They are not three models interpreting a theme.** Nothing in that view can be read as a
   finding about model behaviour.
+
+> **There are five hand-authored motions in the entire system.** Every movement you have ever
+> seen BodyPrompt produce is one of those five, wearing a little seeded jitter.
+
+⚠️ **[`docs/v0-stub.md`](docs/v0-stub.md) is the complete inventory of what v0 fakes** — every
+stand-in, written down in one place, so that nothing in a screenshot can be mistaken for a
+finding. Read it before citing anything this tool shows you.
 
 Everything above is the research **instrument** — deliberately built first, so that v1 only
 has to swap the stub for a model and every one of these views becomes real at once.
