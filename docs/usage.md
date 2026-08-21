@@ -241,19 +241,89 @@ the system changes** — not the frontend, not the renderer, not one of the four
 is the whole reason v0 was built in this order. See
 [`motion-schema.md`](motion-schema.md) for the format a backend must emit.
 
-## Running the v1 Kimodo backend (in development)
+## Running the v1 Kimodo backend (experimental)
 
-The v1 branch isolates Kimodo in a CUDA worker so the main service stays runnable on a
-non-CUDA machine. Copy `.env.example` to `.env`, set `BODYPROMPT_BACKEND=kimodo`, provide a
-fine-grained Hugging Face read token as `HF_TOKEN`, then run:
+This is optional: fixture mode above remains the recommended first run and needs no GPU or
+model account. The v1 path isolates Kimodo in a CUDA worker so the main service remains
+runnable without CUDA.
+
+### Prerequisites
+
+- Linux with an NVIDIA GPU (target: 8–16 GB VRAM).
+- Working NVIDIA drivers and NVIDIA Container Toolkit.
+- Docker with Compose support.
+- Access, on the same Hugging Face account used by the token, to the gated
+  `meta-llama/Meta-Llama-3-8B-Instruct` repository.
+- A fine-grained Hugging Face token with read access.
+
+First confirm that the GPU is available inside a container:
+
+```bash
+nvidia-smi
+docker run --rm --gpus all \
+  nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+Both commands must show the GPU before starting BodyPrompt.
+
+### Configure and start
+
+Copy the example environment, select Kimodo, and add the token:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+```
+
+```dotenv
+BODYPROMPT_BACKEND=kimodo
+HF_TOKEN=hf_replace_with_a_fine_grained_read_token
+BODYPROMPT_DIFFUSION_STEPS=100
+```
+
+Keep the token in `.env`, which is ignored by Git. Do not put it directly in a shell command
+where it may be retained in shell history. Then build and start the service and GPU worker:
 
 ```bash
 docker compose --profile local-gpu up --build
 ```
 
-The operator must first request access to `meta-llama/Meta-Llama-3-8B-Instruct` on Hugging
-Face. The token is a secret: do not commit it. With 8–16 GB VRAM the worker keeps Kimodo on
-CUDA and places its text encoder on CPU.
+The first build and startup can be slow: CUDA-enabled PyTorch, Kimodo, the text encoder and
+model weights must be downloaded. Hugging Face downloads persist in the named
+`huggingface-cache` volume. `docker compose down` preserves it; `docker compose down -v`
+deletes it.
+
+The frontend is not currently included in Compose. Start it in another terminal:
+
+```bash
+cd frontend/app
+pnpm install
+pnpm dev
+```
+
+### Verify it
+
+Check the public service:
+
+```bash
+curl http://localhost:8000/health
+```
+
+The response must report `"backend":"kimodo"`, `"ml":true` and `"ready":true`; the Kimodo
+capability must have `"source":"kimodo"` and `"ready":true`. In the app, only a generated
+motion whose provenance says `source: kimodo` is a real Kimodo result. SnapMoGen and
+Language of Motion continue to return fixtures.
+
+If readiness is false, inspect both services:
+
+```bash
+docker compose logs kimodo-worker
+docker compose logs service
+```
+
+Common causes are a missing NVIDIA Container Toolkit, insufficient VRAM, a token without
+access to the gated repository, gated access accepted under a different Hugging Face
+account, or a change in Kimodo's upstream API.
 
 This path is not considered complete until the GPU checks in
 [`v1-implementation.md`](v1-implementation.md) pass. In every mode, `/health` and the model

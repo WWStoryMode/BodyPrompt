@@ -219,9 +219,11 @@ the canonical motion JSON as the exchange format. React is deliberately deferred
 
 ---
 
-## Run it
+## Quick start — fixture mode
 
-Two processes: the service (serves motions) and the app (renders them). Needs
+This is the recommended first run. It needs no GPU, Hugging Face account or model
+downloads. Two processes are used: the service (serves hand-authored fixture motions) and
+the app (renders them). Needs
 **Python 3.10+ with [uv](https://docs.astral.sh/uv/)** and **Node 18+ with
 [pnpm](https://pnpm.io/)**.
 
@@ -242,6 +244,42 @@ and re-run `python3 fixtures/_generate.py`.
 
 📖 **[`docs/usage.md`](docs/usage.md) is the full guide** — every view, every control, every
 keyboard shortcut, and how to read each of the four notation registers.
+
+## Optional — real Kimodo inference
+
+The experimental v1 backend runs Kimodo locally instead of returning a fixture when the
+Kimodo model is selected. It currently requires:
+
+- Linux with an NVIDIA GPU (target: 8–16 GB VRAM), working drivers and NVIDIA Container
+  Toolkit;
+- access to the gated
+  `meta-llama/Meta-Llama-3-8B-Instruct` repository on Hugging Face; and
+- a fine-grained Hugging Face read token.
+
+Copy `.env.example` to `.env`, set `BODYPROMPT_BACKEND=kimodo`, and add the token as
+`HF_TOKEN`. Do not put the token directly in a shell command or commit `.env`.
+
+```bash
+docker run --rm --gpus all \
+  nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+
+docker compose --profile local-gpu up --build
+
+# In another terminal:
+curl http://localhost:8000/health
+```
+
+The frontend is not part of Compose; start it separately with `pnpm dev` as shown in the
+fixture quick start. The first worker start downloads large model files into the persistent
+`huggingface-cache` Docker volume. Avoid `docker compose down -v` unless you intend to
+delete that cache.
+
+A usable health response has `"backend":"kimodo"`, `"ml":true` and `"ready":true`. Only
+output labelled with runtime provenance `source: kimodo` is real model output; SnapMoGen and
+Language of Motion remain fixtures. This integration still awaits the GPU validation listed
+in [`docs/v1-implementation.md`](docs/v1-implementation.md), so do not yet treat it as a
+production-supported path. See [the full usage guide](docs/usage.md#running-the-v1-kimodo-backend-experimental)
+for setup, verification and troubleshooting.
 
 ### Reading it
 
