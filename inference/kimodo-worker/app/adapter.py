@@ -26,8 +26,37 @@ EDGES = [
     [18, 16], [19, 17], [20, 18], [21, 19],
 ]
 
-# SOMA releases have used both descriptive and mocap-style names. Each destination still
-# resolves to exactly one source joint; aliases are compatibility, not averaging.
+# Kimodo's SOMA skeletons (somaskel30, and the somaskel77 its SOMA models convert their
+# output to) get an exact map rather than an alias search — they have to, because SOMA's
+# mocap-style names collide head-on with the Mixamo-style ones below. In SOMA, "LeftLeg"
+# is the hip and "LeftShin" the knee; in Mixamo, "LeftUpLeg" is the hip and "LeftLeg" the
+# knee. The same string means two different joints, so no single alias table can serve
+# both without silently returning an anatomically false body.
+SOMA_JOINT_MAP = {
+    "pelvis": "Hips",
+    "left_hip": "LeftLeg", "right_hip": "RightLeg",
+    "spine1": "Spine1",
+    "left_knee": "LeftShin", "right_knee": "RightShin",
+    "spine2": "Spine2",
+    "left_ankle": "LeftFoot", "right_ankle": "RightFoot",
+    "spine3": "Chest",
+    "left_foot": "LeftToeBase", "right_foot": "RightToeBase",
+    "neck": "Neck1",
+    "left_collar": "LeftShoulder", "right_collar": "RightShoulder",
+    "head": "Head",
+    "left_shoulder": "LeftArm", "right_shoulder": "RightArm",
+    "left_elbow": "LeftForeArm", "right_elbow": "RightForeArm",
+    "left_wrist": "LeftHand", "right_wrist": "RightHand",
+}
+
+SKELETON_MAPS = {
+    "somaskel77": SOMA_JOINT_MAP,
+    "somaskel30": SOMA_JOINT_MAP,
+}
+
+# Fallback for skeletons we have no exact map for: descriptive and Mixamo-style names.
+# Each destination still resolves to exactly one source joint; aliases are compatibility,
+# not averaging.
 ALIASES = {
     "pelvis": ("pelvis", "root", "hips"),
     "left_hip": ("left_hip", "l_hip", "leftupleg"),
@@ -58,14 +87,21 @@ def _normalized(name: str) -> str:
     return name.lower().replace("-", "").replace("_", "").replace(" ", "")
 
 
-def resolve_joint_indices(source_names: Sequence[str]) -> list[int]:
-    """Resolve canonical joints against runtime names, or report every missing joint."""
+def resolve_joint_indices(source_names: Sequence[str], skeleton_name: str | None = None) -> list[int]:
+    """Resolve canonical joints against runtime names, or report every missing joint.
+
+    A skeleton we have an exact map for is resolved by that map. Anything else falls back
+    to the alias search, which is checked for collisions afterwards — two canonical joints
+    landing on one source joint means the aliases do not fit this skeleton.
+    """
     lookup = {_normalized(name): i for i, name in enumerate(source_names)}
+    exact = SKELETON_MAPS.get(str(skeleton_name or "").lower())
     resolved: list[int] = []
     missing: list[str] = []
     for target in JOINTS:
+        candidates = (exact[target],) if exact else ALIASES[target]
         found = next(
-            (lookup[_normalized(alias)] for alias in ALIASES[target] if _normalized(alias) in lookup),
+            (lookup[_normalized(alias)] for alias in candidates if _normalized(alias) in lookup),
             None,
         )
         if found is None:
@@ -76,6 +112,14 @@ def resolve_joint_indices(source_names: Sequence[str]) -> list[int]:
         available = ", ".join(source_names)
         raise ValueError(
             f"Kimodo skeleton cannot map canonical joints {missing}; available: {available}"
+        )
+    if not exact and len(set(resolved)) != len(resolved):
+        collided = sorted({
+            JOINTS[i] for i, index in enumerate(resolved) if resolved.count(index) > 1
+        })
+        raise ValueError(
+            f"Kimodo skeleton {skeleton_name!r} maps several canonical joints onto one source "
+            f"joint ({collided}); its naming needs an exact map, not aliases"
         )
     return resolved
 
@@ -118,6 +162,7 @@ def adapt_motion(
     fps: int,
     prompt: str,
     seed: int,
+    skeleton_name: str | None = None,
 ) -> dict:
     """Return one non-nesting `bodyprompt.motion/v0` motion."""
     if positions.ndim != 3 or positions.shape[-1] != 3:
@@ -127,7 +172,7 @@ def adapt_motion(
             f"expected rotations [T,J,3,3] matching positions, got {local_rotations.shape}"
         )
 
-    indices = resolve_joint_indices(source_names)
+    indices = resolve_joint_indices(source_names, skeleton_name)
     pos = np.asarray(positions[:, indices, :], dtype=np.float64).copy()
     rot = np.asarray(local_rotations[:, indices, :, :], dtype=np.float64)
     if not np.isfinite(pos).all() or not np.isfinite(rot).all():

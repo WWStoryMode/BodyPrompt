@@ -15,6 +15,11 @@ services:
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
       TEXT_ENCODER_DEVICE: cpu
+      # "local" loads the LLM2Vec encoder in this container; "api" points at a
+      # `kimodo_textencoder` server elsewhere via TEXT_ENCODER_URL. Either way it is the
+      # same encoder — the embeddings Kimodo was trained on — only its host changes.
+      TEXT_ENCODER_MODE: ${TEXT_ENCODER_MODE:-local}
+      TEXT_ENCODER_URL: ${TEXT_ENCODER_URL:-}
       BODYPROMPT_DIFFUSION_STEPS: ${BODYPROMPT_DIFFUSION_STEPS:-100}
     volumes:
       - huggingface-cache:/root/.cache/huggingface

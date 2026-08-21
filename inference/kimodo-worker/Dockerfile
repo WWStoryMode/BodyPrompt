@@ -1,4 +1,5 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+# CUDA 12.8: Blackwell cards (RTX 50-series, sm_120) have no kernels in cu124 builds.
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -10,8 +11,8 @@ COPY pyproject.toml .
 COPY app app
 RUN python3.10 -m pip install --no-cache-dir --upgrade pip \
     && python3.10 -m pip install --no-cache-dir \
-      torch==2.6.0 torchvision==0.21.0 \
-      --index-url https://download.pytorch.org/whl/cu124 \
+      torch==2.9.1 torchvision==0.24.1 \
+      --index-url https://download.pytorch.org/whl/cu128 \
     && python3.10 -m pip install --no-cache-dir . \
     && python3.10 -m pip install --no-cache-dir \
       "git+https://github.com/nv-tlabs/kimodo.git"

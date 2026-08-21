@@ -1,7 +1,38 @@
 import numpy as np
 import pytest
 
-from app.adapter import JOINTS, adapt_motion, matrix_to_quaternion, resolve_joint_indices
+from app.adapter import (
+    JOINTS,
+    SOMA_JOINT_MAP,
+    adapt_motion,
+    matrix_to_quaternion,
+    resolve_joint_indices,
+)
+
+# Kimodo's somaskel30 bone order, verbatim from kimodo.skeleton.definitions.
+SOMASKEL30 = [
+    "Hips", "Spine1", "Spine2", "Chest", "Neck1", "Neck2", "Head", "Jaw", "LeftEye",
+    "RightEye", "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand", "LeftHandThumbEnd",
+    "LeftHandMiddleEnd", "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+    "RightHandThumbEnd", "RightHandMiddleEnd", "LeftLeg", "LeftShin", "LeftFoot",
+    "LeftToeBase", "RightLeg", "RightShin", "RightFoot", "RightToeBase",
+]
+
+
+def test_soma_skeleton_maps_to_the_named_joint_not_a_lookalike():
+    indices = resolve_joint_indices(SOMASKEL30, "somaskel30")
+
+    assert [SOMASKEL30[i] for i in indices] == [SOMA_JOINT_MAP[joint] for joint in JOINTS]
+    # The trap the exact map exists to avoid: SOMA's LeftLeg is the hip, not the knee.
+    assert SOMASKEL30[indices[JOINTS.index("left_hip")]] == "LeftLeg"
+    assert SOMASKEL30[indices[JOINTS.index("left_knee")]] == "LeftShin"
+
+
+def test_aliases_refuse_to_map_two_joints_onto_one():
+    source = ["LeftFoot" if name == "left_ankle" else name for name in JOINTS]
+
+    with pytest.raises(ValueError, match="onto one source joint"):
+        resolve_joint_indices(source)
 
 
 def test_resolves_names_not_source_order():

@@ -58,9 +58,23 @@ def _numpy(value) -> np.ndarray:
     return np.asarray(value)
 
 
-def _joint_names(model) -> list[str]:
-    skeleton = getattr(model, "skeleton", None)
-    for attr in ("joint_names", "names"):
+def _output_skeleton(model):
+    """The skeleton the *returned* motion is expressed in.
+
+    Kimodo's SOMA models denoise on somaskel30 but convert their output to somaskel77
+    before returning it, so `model.skeleton` names the wrong body: reading joint names
+    from it would index a 77-joint motion with a 30-joint name list.
+    """
+    skeleton = getattr(model, "output_skeleton", None)
+    if skeleton is None:
+        skeleton = getattr(model, "skeleton", None)
+    if skeleton is None:
+        raise RuntimeError("Kimodo model did not expose an output skeleton")
+    return skeleton
+
+
+def _joint_names(skeleton) -> list[str]:
+    for attr in ("bone_order_names", "joint_names", "names"):
         names = getattr(skeleton, attr, None)
         if names is not None:
             return [str(name) for name in names]
@@ -74,7 +88,7 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     output = model(
-        prompt=req.prompt,  # raw on purpose: prompt mediation would change the research
+        prompts=req.prompt,  # raw on purpose: prompt mediation would change the research
         num_frames=round(req.duration_seconds * FPS),
         num_denoising_steps=int(os.environ.get("BODYPROMPT_DIFFUSION_STEPS", "100")),
     )
@@ -88,13 +102,15 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
         positions = positions[0]
     if rotations.ndim == 5:
         rotations = rotations[0]
+    skeleton = _output_skeleton(model)
     return adapt_motion(
         positions,
         rotations,
-        _joint_names(model),
+        _joint_names(skeleton),
         fps=FPS,
         prompt=req.prompt,
         seed=seed,
+        skeleton_name=str(getattr(skeleton, "name", "") or ""),
     )
 
 
