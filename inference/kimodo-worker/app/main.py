@@ -97,13 +97,18 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
         num_frames=round(req.duration_seconds * FPS),
         num_denoising_steps=int(os.environ.get("BODYPROMPT_DIFFUSION_STEPS", "100")),
         post_processing=req.post_processing,
+        # Required, even though it is the default count: passing a bare prompt with
+        # num_samples=None makes Kimodo squeeze the batch dimension before
+        # post-processing, which then asserts that the batch dimension is present.
+        # Kimodo's own CLI always passes this for the same reason.
+        num_samples=1,
     )
     if not isinstance(output, dict):
         raise RuntimeError(f"unexpected Kimodo output type: {type(output).__name__}")
 
     positions = _numpy(output["posed_joints"])
     rotations = _numpy(output["local_rot_mats"])
-    # The low-level API may retain a batch dimension for one sample.
+    # num_samples=1 above keeps a batch dimension of one; strip it.
     if positions.ndim == 4:
         positions = positions[0]
     if rotations.ndim == 5:
