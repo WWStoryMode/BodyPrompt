@@ -48,6 +48,9 @@ class GenerateRequest(BaseModel):
     # The UI deliberately chooses a fresh seed. The API accepts one so a research result
     # can be reproduced without adding a seed control to the instrument.
     seed: int | None = Field(default=None, ge=0, lt=2**31)
+    # Kimodo's foot-skate and constraint cleanup; ignored by fixture backends. Which one
+    # produced a given motion is recorded in its provenance.
+    post_processing: bool = True
 
 
 @app.get("/health")
@@ -72,6 +75,7 @@ def generate(req: GenerateRequest) -> dict:
                 variants=req.variants,
                 duration_seconds=req.duration_seconds,
                 seed=req.seed,
+                post_processing=req.post_processing,
             )
         )
     except RuntimeError as err:

@@ -21,6 +21,11 @@ class GenerateRequest(BaseModel):
     duration_seconds: float = Field(default=5.0, ge=2.0, le=10.0)
     variants: int = Field(default=1, ge=1, le=4)
     seed: int = Field(ge=0, lt=2**31)
+    # Kimodo's foot-skate and constraint cleanup. On by default, as in Kimodo's own CLI:
+    # unplanted feet would corrupt the floor-path and Laban support readings. Ask for
+    # False to see the denoiser's raw output; either way the answer is recorded in
+    # provenance, so no motion is ambiguous about which one it is.
+    post_processing: bool = True
 
 
 @lru_cache(maxsize=1)
@@ -91,6 +96,7 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
         prompts=req.prompt,  # raw on purpose: prompt mediation would change the research
         num_frames=round(req.duration_seconds * FPS),
         num_denoising_steps=int(os.environ.get("BODYPROMPT_DIFFUSION_STEPS", "100")),
+        post_processing=req.post_processing,
     )
     if not isinstance(output, dict):
         raise RuntimeError(f"unexpected Kimodo output type: {type(output).__name__}")
@@ -103,7 +109,7 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
     if rotations.ndim == 5:
         rotations = rotations[0]
     skeleton = _output_skeleton(model)
-    return adapt_motion(
+    motion = adapt_motion(
         positions,
         rotations,
         _joint_names(skeleton),
@@ -112,6 +118,8 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
         seed=seed,
         skeleton_name=str(getattr(skeleton, "name", "") or ""),
     )
+    motion["post_processing"] = req.post_processing
+    return motion
 
 
 @app.get("/health")

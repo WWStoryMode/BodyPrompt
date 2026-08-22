@@ -14,6 +14,9 @@ services:
     build: ./inference/kimodo-worker
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
+      # Model loading prints to stdout, which Python buffers when it is not a terminal.
+      # Without this the first sign of life is minutes of silence.
+      PYTHONUNBUFFERED: "1"
       TEXT_ENCODER_DEVICE: cpu
       # "local" loads the LLM2Vec encoder in this container; "api" points at a
       # `kimodo_textencoder` server elsewhere via TEXT_ENCODER_URL. Either way it is the

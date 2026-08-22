@@ -21,6 +21,26 @@ def test_stub_reports_fixture_provenance_and_non_nesting_variants():
     assert validate_motion(motion) is motion
 
 
+def test_kimodo_provenance_records_what_the_worker_did_not_what_was_asked():
+    from app.generators import KimodoGenerator
+
+    generator = KimodoGenerator()
+    worker_motion = StubGenerator().generate("kimodo", "move")
+    worker_motion["post_processing"] = False  # the worker's own report
+
+    generator._json = lambda path, payload=None: worker_motion
+    motion = generator.generate("kimodo", "move", post_processing=True)
+
+    assert motion["provenance"]["post_processing"] is False
+    assert "post_processing" not in motion  # it belongs in provenance, not beside it
+
+
+def test_fixture_provenance_says_post_processing_never_applied():
+    motion = StubGenerator().generate("snapmogen", "move", post_processing=True)
+
+    assert motion["provenance"]["post_processing"] is None
+
+
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
