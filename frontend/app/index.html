@@ -27,12 +27,23 @@
           value="a body remembers a place it cannot return to"
           spellcheck="false"
         />
-        <select id="model" class="model-select">
-          <option value="snapmogen">SnapMoGen</option>
-          <option value="language-of-motion">Language of Motion</option>
-          <option value="kimodo">Kimodo</option>
+        <select id="model" class="model-select" aria-label="Motion model">
+          <option value="kimodo">Kimodo · checking…</option>
+          <option value="snapmogen">SnapMoGen · checking…</option>
+          <option value="language-of-motion">Language of Motion · checking…</option>
         </select>
+        <label class="duration">
+          <span>duration</span>
+          <select id="duration" class="model-select">
+            <option value="2">2 s</option>
+            <option value="3">3 s</option>
+            <option value="5" selected>5 s</option>
+            <option value="7">7 s</option>
+            <option value="10">10 s</option>
+          </select>
+        </label>
         <button id="generate" class="btn">Generate</button>
+        <span id="generation-status" class="generation-status" aria-live="polite"></span>
       </div>
 
       <div class="body">
@@ -94,14 +105,14 @@
            =================================================================== -->
       <div id="tri" class="tri">
         <div class="tri-banner">
-          <b>stub</b> — the three models differ here only because the stub hashes
-          <i>(model, prompt)</i>. These are <b>not</b> three models interpreting a theme.
-          The comparison becomes real when a model lands.
+          <b>mixed sources</b> — Kimodo is real only when the local GPU backend is ready.
+          SnapMoGen and Language of Motion remain labeled fixtures. This view is
+          <b>not evidence of cross-model interpretation</b>.
         </div>
         <div class="tri-cols">
           <div class="tri-col" data-model="snapmogen">
             <div class="tri-head">
-              <span class="tri-name">SnapMoGen</span>
+              <span id="tri-name-snapmogen" class="tri-name">SnapMoGen · checking…</span>
               <span class="tri-mode">write</span>
             </div>
             <div class="tri-stage" id="tri-stage-snapmogen"></div>
@@ -109,7 +120,7 @@
           </div>
           <div class="tri-col" data-model="language-of-motion">
             <div class="tri-head">
-              <span class="tri-name">Language of Motion</span>
+              <span id="tri-name-language-of-motion" class="tri-name">Language of Motion · checking…</span>
               <span class="tri-mode">voice</span>
             </div>
             <div class="tri-stage" id="tri-stage-language-of-motion"></div>
@@ -117,7 +128,7 @@
           </div>
           <div class="tri-col" data-model="kimodo">
             <div class="tri-head">
-              <span class="tri-name">Kimodo</span>
+              <span id="tri-name-kimodo" class="tri-name">Kimodo · checking…</span>
               <span class="tri-mode">sculpt</span>
             </div>
             <div class="tri-stage" id="tri-stage-kimodo"></div>

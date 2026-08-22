@@ -48,6 +48,7 @@ One motion is one JSON object:
 | `model` | Which model (nominally) produced it. In v0 this is just an echo. |
 | `seed` | Generation seed — part of making variation reproducible. |
 | `variants` | *Optional.* The **ghost-cloud**: sibling motions from the same prompt with different seeds (see below). |
+| `provenance` | *Optional, v1.* Honest source metadata: `source`, `backend`, `model_version`, and measured `inference_ms`. |
 
 ## The ghost-cloud (`variants`)
 

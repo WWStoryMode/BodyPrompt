@@ -2,7 +2,7 @@
 //
 //   type a phrase  ->  POST /generate  ->  canonical motion  ->  three.js playback
 //
-// The motion is hand-authored fixture data served by the v0 stub (no ML). This file
+// The selected backend may be real Kimodo or an explicitly-labelled fixture. This file
 // only orchestrates DOM + fetch + renderer; the drawing lives in renderer.ts.
 
 import "./style.css";
@@ -26,7 +26,9 @@ const VARIANTS = 4;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const promptEl = $<HTMLInputElement>("prompt");
 const modelEl = $<HTMLSelectElement>("model");
+const durationEl = $<HTMLSelectElement>("duration");
 const generateEl = $<HTMLButtonElement>("generate");
+const generationStatusEl = $<HTMLSpanElement>("generation-status");
 const stageEl = $<HTMLDivElement>("stage");
 const telemetryEl = $<HTMLDivElement>("telemetry");
 const hintEl = $<HTMLDivElement>("hint");
@@ -115,14 +117,19 @@ async function generateTriptych(): Promise<void> {
         const res = await fetch(`${API_BASE}/generate`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: id, prompt, variants: 1 }),
+          body: JSON.stringify({
+            model: id,
+            prompt,
+            variants: 1,
+            duration_seconds: Number(durationEl.value),
+          }),
         });
-        if (!res.ok) throw new Error(`service responded ${res.status}`);
+        if (!res.ok) throw new Error(await responseError(res));
         const motion = (await res.json()) as CanonicalMotion;
         r.load(motion);
-        footEl.textContent = `seed ${motion.seed} · ${motion.frames.length} frames${
-          motion.stub ? " · stub" : ""
-        }`;
+        footEl.textContent =
+          `seed ${motion.seed} · ${motion.frames.length} frames · ` +
+          `${motion.provenance?.source ?? (motion.stub ? "fixture" : "unknown")}`;
       } catch (err) {
         footEl.textContent = `error: ${(err as Error).message}`;
       }
@@ -238,11 +245,19 @@ function showMotion(motion: CanonicalMotion): void {
   perfPhraseEl.textContent = `“${motion.prompt}”`;
 
   const ghostCount = motion.variants?.length ?? 0;
+  const provenance = motion.provenance;
+  const safe = (value: unknown) =>
+    String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   telemetryEl.innerHTML =
-    `<span class="k">model</span> ${motion.model}<br>` +
-    `<span class="k">prompt</span> “${motion.prompt}”<br>` +
+    `<span class="k">model</span> ${safe(motion.model)}<br>` +
+    `<span class="k">prompt</span> “${safe(motion.prompt)}”<br>` +
     `<span class="k">seed</span> ${motion.seed}<br>` +
     `<span class="k">joints</span> ${motion.joints.length} · ${motion.skeleton}<br>` +
+    (provenance
+      ? `<span class="k">source</span> ${safe(provenance.source)} · ` +
+        `${safe(provenance.model_version)}<br>` +
+        `<span class="k">generated</span> ${(provenance.inference_ms / 1000).toFixed(1)} s<br>`
+      : "") +
     (ghostCount
       ? `<span class="k">cloud</span> ${ghostCount} other seeds<br>`
       : "") +
@@ -261,9 +276,25 @@ renderer.onFrame(({ frame, total, fps, playing }) => {
 });
 
 // ---- generate ----
+async function responseError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { detail?: string };
+    return body.detail ?? `service responded ${res.status}`;
+  } catch {
+    return `service responded ${res.status}`;
+  }
+}
+
+function setGenerating(on: boolean, message = ""): void {
+  generateEl.disabled = on;
+  generateEl.textContent = on ? "…" : "Generate";
+  generationStatusEl.textContent = message;
+  generationStatusEl.className = `generation-status${on ? " busy" : ""}`;
+}
+
 async function generate(): Promise<void> {
-  generateEl.disabled = true;
-  generateEl.textContent = "…";
+  const started = performance.now();
+  setGenerating(true, "generating…");
   try {
     const res = await fetch(`${API_BASE}/generate`, {
       method: "POST",
@@ -272,9 +303,10 @@ async function generate(): Promise<void> {
         model: modelEl.value,
         prompt: promptEl.value,
         variants: VARIANTS, // ask for the ghost-cloud alongside the primary
+        duration_seconds: Number(durationEl.value),
       }),
     });
-    if (!res.ok) throw new Error(`service responded ${res.status}`);
+    if (!res.ok) throw new Error(await responseError(res));
     const motion = (await res.json()) as CanonicalMotion;
     if (!motion.frames?.length) throw new Error("motion had no frames");
 
@@ -283,15 +315,49 @@ async function generate(): Promise<void> {
     lineage.add(motion, lineage.currentId);
     showMotion(motion);
     drawTree();
+    generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
   } catch (err) {
     hintEl.classList.remove("hidden");
     hintEl.innerHTML =
-      `Couldn't reach the service (${(err as Error).message}).<br>` +
-      `Start it, then click <b>Generate</b>:<br>` +
-      `<code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>`;
+      `Generation failed: ${String((err as Error).message)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}.<br>` +
+      `The previous motion is still in the lineage.`;
+    generationStatusEl.textContent = "failed";
+    generationStatusEl.className = "generation-status error";
   } finally {
     generateEl.disabled = false;
     generateEl.textContent = "Generate";
+    if (!generationStatusEl.classList.contains("error")) {
+      generationStatusEl.className = "generation-status";
+    }
+  }
+}
+
+/** The backend, not static HTML, is the source of truth about what is real. */
+async function refreshCapabilities(): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) return;
+    const health = (await res.json()) as {
+      capabilities?: { model: string; source: string; ready: boolean }[];
+    };
+    for (const capability of health.capabilities ?? []) {
+      const option = modelEl.querySelector<HTMLOptionElement>(
+        `option[value="${capability.model}"]`,
+      );
+      if (!option) continue;
+      const name = capability.model === "language-of-motion"
+        ? "Language of Motion"
+        : capability.model === "snapmogen" ? "SnapMoGen" : "Kimodo";
+      const state = capability.source === "fixture"
+        ? "stub"
+        : capability.ready ? "real" : "real · unavailable";
+      option.textContent = `${name} · ${state}`;
+      const triptychName = document.getElementById(`tri-name-${capability.model}`);
+      if (triptychName) triptychName.textContent = `${name} · ${state}`;
+    }
+  } catch {
+    // Generate owns the full actionable service error; leave "checking…" honest here.
   }
 }
 
@@ -370,7 +436,7 @@ window.addEventListener("keydown", (e) => {
 // Draw the (empty) tree, then generate once on load so the stage isn't empty and the
 // search has a root (fails gracefully if the service is down).
 drawTree();
-generate();
+void refreshCapabilities().then(generate);
 
 // Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
 // projector without fumbling through chrome in front of a room); ?compare=1 opens the

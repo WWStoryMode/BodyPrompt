@@ -1,0 +1,38 @@
+services:
+  service:
+    build:
+      context: .
+      dockerfile: service/Dockerfile
+    environment:
+      BODYPROMPT_BACKEND: ${BODYPROMPT_BACKEND:-stub}
+      BODYPROMPT_KIMODO_URL: http://kimodo-worker:8010
+    ports:
+      - "8000:8000"
+
+  kimodo-worker:
+    profiles: ["local-gpu"]
+    build: ./inference/kimodo-worker
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      # Model loading prints to stdout, which Python buffers when it is not a terminal.
+      # Without this the first sign of life is minutes of silence.
+      PYTHONUNBUFFERED: "1"
+      TEXT_ENCODER_DEVICE: cpu
+      # "local" loads the LLM2Vec encoder in this container; "api" points at a
+      # `kimodo_textencoder` server elsewhere via TEXT_ENCODER_URL. Either way it is the
+      # same encoder — the embeddings Kimodo was trained on — only its host changes.
+      TEXT_ENCODER_MODE: ${TEXT_ENCODER_MODE:-local}
+      TEXT_ENCODER_URL: ${TEXT_ENCODER_URL:-}
+      BODYPROMPT_DIFFUSION_STEPS: ${BODYPROMPT_DIFFUSION_STEPS:-100}
+    volumes:
+      - huggingface-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  huggingface-cache:

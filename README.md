@@ -163,7 +163,7 @@ in front of an audience:
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
-| **v1** | Single-model prompting — a real model behind the service (needs weights + a GPU) | **next — everything now waits on this** |
+| **v1** | Single-model prompting — Kimodo behind the service | ◐ generating; calibration open |
 | **v4** | The public lecture performance itself — the search performed live | |
 | **v5** | Open research platform — others can search too | |
 
@@ -200,7 +200,9 @@ spine of it (everything except the models):
   Live as a **fixture stub** (no ML) so the search loop is real before any weights load.
   → [`service/`](service/).
 - ✗ **Per-model adapters** — SnapMoGen, Language of Motion, Kimodo → canonical. *Not built.*
-- ✗ **A model behind the service** — the v1 step; needs weights + likely a GPU. *Not built.*
+- ◐ **A model behind the service** — Kimodo generates real motion on the target GPU, and
+  the canonical skeleton is anatomically verified. Latency calibration remains.
+  → [`docs/v1-implementation.md`](docs/v1-implementation.md)
 
 ```
 fixtures/              canonical motion JSON (hand-authored) + generator
@@ -218,9 +220,11 @@ the canonical motion JSON as the exchange format. React is deliberately deferred
 
 ---
 
-## Run it
+## Quick start — fixture mode
 
-Two processes: the service (serves motions) and the app (renders them). Needs
+This is the recommended first run. It needs no GPU, Hugging Face account or model
+downloads. Two processes are used: the service (serves hand-authored fixture motions) and
+the app (renders them). Needs
 **Python 3.10+ with [uv](https://docs.astral.sh/uv/)** and **Node 18+ with
 [pnpm](https://pnpm.io/)**.
 
@@ -241,6 +245,47 @@ and re-run `python3 fixtures/_generate.py`.
 
 📖 **[`docs/usage.md`](docs/usage.md) is the full guide** — every view, every control, every
 keyboard shortcut, and how to read each of the four notation registers.
+
+## Optional — real Kimodo inference
+
+The experimental v1 backend runs Kimodo locally instead of returning a fixture when the
+Kimodo model is selected. It currently requires:
+
+- Linux with an NVIDIA GPU (target: 8–16 GB VRAM), working drivers and NVIDIA Container
+  Toolkit;
+- access to the gated
+  `meta-llama/Meta-Llama-3-8B-Instruct` repository on Hugging Face; and
+- a fine-grained Hugging Face read token.
+
+Copy `.env.example` to `.env`, set `BODYPROMPT_BACKEND=kimodo`, and add the token as
+`HF_TOKEN`. Do not put the token directly in a shell command or commit `.env`.
+
+```bash
+docker run --rm --gpus all \
+  nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+
+docker compose --profile local-gpu up --build
+
+# In another terminal:
+curl http://localhost:8000/health
+```
+
+The frontend is not part of Compose; start it separately with `pnpm dev` as shown in the
+fixture quick start. The first worker start downloads large model files into the persistent
+`huggingface-cache` Docker volume. Avoid `docker compose down -v` unless you intend to
+delete that cache.
+
+A usable health response has `"backend":"kimodo"`, `"ml":true` and `"ready":true`. Only
+output labelled with runtime provenance `source: kimodo` is real model output; SnapMoGen and
+Language of Motion remain fixtures.
+
+This path has been validated on an RTX 5080: the motion is real and the skeleton is
+anatomically sound. It is still not a production-supported route — one prompt plus a
+ghost-cloud takes about 25 seconds rather than the intended 15, and it wants a GPU, a
+gated Hugging Face repository and roughly 18 GB of downloads. The open items are listed in
+[`docs/v1-implementation.md`](docs/v1-implementation.md). See
+[the full usage guide](docs/usage.md#running-the-v1-kimodo-backend-experimental)
+for setup, verification and troubleshooting.
 
 ### Reading it
 
@@ -287,35 +332,43 @@ The original static mockups need no build — just `open frontend/mockups/index.
 
 ## Status
 
-**The research instrument runs — on stub data. No ML, no model weights, no GPU.**
+**The research instrument runs in fixture mode by default. The v1 Kimodo path now generates
+real movement on its target GPU; what remains is calibration and instrument design, not
+whether the boundary works.**
 
 Working today: type a phrase → a 3D stick figure moves; every prompt branches into a
 **lineage tree** (nothing is overwritten); one prompt shows **many seeds** as a variance
 **ghost-cloud**; and the motion is reduced to four readable **notation registers** — a Marey
 **chronophotograph**, a **notation strip**, a **floor path**, and a **Laban-inspired score**.
-A pluggable `Generator` backend sits ready for a real model.
+A pluggable `Generator` routes either to the five fixtures or to the isolated Kimodo worker.
 
 Also working: the **multi-model triptych** (one prompt, three models side by side, each
 keeping its native way of authoring) and **performance mode** (the projectable stage).
 
 **The honest catch — please read before drawing any conclusion from a screenshot:**
 
-- The motion is a **placeholder fixture chosen by hashing the prompt**, not generated by any
-  model. The system does **not understand what you type**.
-- The **variance** (ghost-cloud) is a seeded perturbation, not a model sampling different outputs.
-- In the **triptych**, the three models differ *only because the stub hashes `(model, prompt)`*.
-  **They are not three models interpreting a theme.** Nothing in that view can be read as a
-  finding about model behaviour.
+- In default fixture mode, the motion is chosen by hashing the prompt; the prompt is not
+  understood and the ghost-cloud is seeded perturbation.
+- With the v1 backend, only an output whose runtime provenance says `source: kimodo` is a
+  model generation. The UI derives that label from `/health`, not from the selected name.
+- SnapMoGen and Language of Motion remain fixtures. The mixed triptych is therefore **not
+  evidence of cross-model interpretation**, even when its Kimodo panel is real.
 
-> **There are five hand-authored motions in the entire system.** Every movement you have ever
-> seen BodyPrompt produce is one of those five, wearing a little seeded jitter.
+> **In fixture mode there are five hand-authored motions in the entire system**, and every
+> movement you see is one of those five wearing a little seeded jitter. That is the default,
+> and it is what every screenshot in this repository shows. Only an output labelled
+> `source: kimodo` escapes it.
 
 ⚠️ **[`docs/v0-stub.md`](docs/v0-stub.md) is the complete inventory of what v0 fakes** — every
 stand-in, written down in one place, so that nothing in a screenshot can be mistaken for a
 finding. Read it before citing anything this tool shows you.
 
-Everything above is the research **instrument** — deliberately built first, so that v1 only
-has to swap the stub for a model and every one of these views becomes real at once.
+Two findings from the first real generations are worth knowing before reading a Kimodo
+ghost-cloud: real siblings vary the **legs** far more than the fixtures do — the stub damps
+ankles and knees on an assumption of planted feet that the model does not share — and about
+**three quarters** of the difference between siblings is how far each one travels, not how
+it moves. See [`docs/v1-implementation.md`](docs/v1-implementation.md) for the measurements,
+the local-GPU setup, and what remains open.
 Repo: **Public**.
 
 ## Licence

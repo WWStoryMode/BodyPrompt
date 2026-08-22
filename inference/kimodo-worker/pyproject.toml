@@ -1,10 +1,11 @@
 [project]
-name = "bodyprompt-service"
+name = "bodyprompt-kimodo-worker"
 version = "0.1.0"
-description = "BodyPrompt inference service — canonical motion from fixtures or Kimodo."
-requires-python = ">=3.10"
+description = "Local Kimodo inference and SOMA-to-BodyPrompt canonical adapter."
+requires-python = ">=3.10,<3.12"
 dependencies = [
     "fastapi>=0.110",
+    "numpy>=1.26",
     "uvicorn>=0.29",
 ]
 
