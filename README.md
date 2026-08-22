@@ -163,7 +163,7 @@ in front of an audience:
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
-| **v1** | Single-model prompting — Kimodo behind the service | **in development** |
+| **v1** | Single-model prompting — Kimodo behind the service | ◐ generating; calibration open |
 | **v4** | The public lecture performance itself — the search performed live | |
 | **v5** | Open research platform — others can search too | |
 
@@ -200,8 +200,9 @@ spine of it (everything except the models):
   Live as a **fixture stub** (no ML) so the search loop is real before any weights load.
   → [`service/`](service/).
 - ✗ **Per-model adapters** — SnapMoGen, Language of Motion, Kimodo → canonical. *Not built.*
-- ◐ **A model behind the service** — Kimodo provider + adapter implemented; GPU validation
-  and latency calibration remain. → [`docs/v1-implementation.md`](docs/v1-implementation.md)
+- ◐ **A model behind the service** — Kimodo generates real motion on the target GPU, and
+  the canonical skeleton is anatomically verified. Latency calibration remains.
+  → [`docs/v1-implementation.md`](docs/v1-implementation.md)
 
 ```
 fixtures/              canonical motion JSON (hand-authored) + generator
@@ -276,9 +277,14 @@ delete that cache.
 
 A usable health response has `"backend":"kimodo"`, `"ml":true` and `"ready":true`. Only
 output labelled with runtime provenance `source: kimodo` is real model output; SnapMoGen and
-Language of Motion remain fixtures. This integration still awaits the GPU validation listed
-in [`docs/v1-implementation.md`](docs/v1-implementation.md), so do not yet treat it as a
-production-supported path. See [the full usage guide](docs/usage.md#running-the-v1-kimodo-backend-experimental)
+Language of Motion remain fixtures.
+
+This path has been validated on an RTX 5080: the motion is real and the skeleton is
+anatomically sound. It is still not a production-supported route — one prompt plus a
+ghost-cloud takes about 25 seconds rather than the intended 15, and it wants a GPU, a
+gated Hugging Face repository and roughly 18 GB of downloads. The open items are listed in
+[`docs/v1-implementation.md`](docs/v1-implementation.md). See
+[the full usage guide](docs/usage.md#running-the-v1-kimodo-backend-experimental)
 for setup, verification and troubleshooting.
 
 ### Reading it
@@ -326,8 +332,9 @@ The original static mockups need no build — just `open frontend/mockups/index.
 
 ## Status
 
-**The research instrument runs in fixture mode. The v1 Kimodo path is implemented and
-awaiting validation on its target GPU before it can support research claims.**
+**The research instrument runs in fixture mode by default. The v1 Kimodo path now generates
+real movement on its target GPU; what remains is calibration and instrument design, not
+whether the boundary works.**
 
 Working today: type a phrase → a 3D stick figure moves; every prompt branches into a
 **lineage tree** (nothing is overwritten); one prompt shows **many seeds** as a variance
@@ -347,15 +354,21 @@ keeping its native way of authoring) and **performance mode** (the projectable s
 - SnapMoGen and Language of Motion remain fixtures. The mixed triptych is therefore **not
   evidence of cross-model interpretation**, even when its Kimodo panel is real.
 
-> **There are five hand-authored motions in the entire system.** Every movement you have ever
-> seen BodyPrompt produce is one of those five, wearing a little seeded jitter.
+> **In fixture mode there are five hand-authored motions in the entire system**, and every
+> movement you see is one of those five wearing a little seeded jitter. That is the default,
+> and it is what every screenshot in this repository shows. Only an output labelled
+> `source: kimodo` escapes it.
 
 ⚠️ **[`docs/v0-stub.md`](docs/v0-stub.md) is the complete inventory of what v0 fakes** — every
 stand-in, written down in one place, so that nothing in a screenshot can be mistaken for a
 finding. Read it before citing anything this tool shows you.
 
-See [`docs/v1-implementation.md`](docs/v1-implementation.md) for the completed slice, the
-local-GPU setup, and the checks that remain before v1 is called complete.
+Two findings from the first real generations are worth knowing before reading a Kimodo
+ghost-cloud: real siblings vary the **legs** far more than the fixtures do — the stub damps
+ankles and knees on an assumption of planted feet that the model does not share — and about
+**three quarters** of the difference between siblings is how far each one travels, not how
+it moves. See [`docs/v1-implementation.md`](docs/v1-implementation.md) for the measurements,
+the local-GPU setup, and what remains open.
 Repo: **Public**.
 
 ## Licence

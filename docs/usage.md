@@ -325,6 +325,8 @@ Common causes are a missing NVIDIA Container Toolkit, insufficient VRAM, a token
 access to the gated repository, gated access accepted under a different Hugging Face
 account, or a change in Kimodo's upstream API.
 
-This path is not considered complete until the GPU checks in
-[`v1-implementation.md`](v1-implementation.md) pass. In every mode, `/health` and the model
-selector state whether an output is real, a fixture, or unavailable.
+The GPU checks in [`v1-implementation.md`](v1-implementation.md) have now passed on an
+RTX 5080: the motion is real and the skeleton is anatomically verified. Expect about six
+seconds for a single motion and around twenty-five for a prompt plus its ghost-cloud, which
+is over the intended budget — the UI will sit and wait for it. In every mode, `/health` and
+the model selector state whether an output is real, a fixture, or unavailable.
