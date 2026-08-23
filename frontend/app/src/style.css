@@ -123,7 +123,7 @@ html, body {
 }
 .btn:disabled { opacity: 0.5; cursor: default; }
 
-/* ---- lineage rail ---- */
+/* ---- the poem rail (left) ---- */
 .rail {
   width: 250px;
   flex-shrink: 0;
@@ -153,17 +153,88 @@ html, body {
 }
 .rail-hint b { color: var(--ink-dim); }
 
-/* the tree itself (SVG, rebuilt on every change by lineage.ts) */
-.tree-empty { fill: var(--ink-faint); font-family: var(--mono); font-size: 11px; }
-.tree-edge { stroke: var(--line); stroke-width: 1.5; }
-.tree-node { cursor: pointer; outline: none; }
-.tree-dot { fill: var(--ink-faint); transition: fill 0.12s; }
-.tree-label { fill: var(--ink-dim); font-family: var(--mono); font-size: 11px; }
-.tree-node:hover .tree-dot { fill: var(--ink-dim); }
-.tree-node:hover .tree-label { fill: var(--ink); }
-.tree-node:focus-visible .tree-dot { stroke: var(--accent); stroke-width: 2; }
-.tree-node.current .tree-dot { fill: var(--accent); }
-.tree-node.current .tree-label { fill: var(--ink); }
+/* ---- the poem: each line a prompt, each with its own state ---- */
+.rail-poem { width: 300px; }
+.poem-lines { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; }
+.poem-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.poem-line.selected { background: rgba(233, 184, 114, 0.06); border-color: var(--line); }
+/* The line the body is answering right now — the score follows the movement. */
+.poem-line.playing .poem-text { color: var(--ink); }
+.poem-line.playing .poem-state { box-shadow: 0 0 0 3px rgba(233, 184, 114, 0.16); }
+.poem-text {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 2px;
+}
+.poem-text:focus { color: var(--ink); }
+.poem-dur {
+  width: 34px;
+  background: transparent;
+  border: none;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-align: right;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.poem-dur::-webkit-inner-spin-button, .poem-dur::-webkit-outer-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.poem-loop {
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  color: var(--ink-faint); font-size: 12px; line-height: 1;
+}
+.poem-loop:hover { color: var(--ink); }
+.poem-line.looping .poem-loop { color: var(--accent); }
+
+/* State is a dot, because the difference between a draft and a bake is the whole point:
+   hollow = nothing yet, amber = drafted alone, solid = baked and carrying through. */
+.poem-state {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--ink-faint); background: transparent;
+}
+.poem-line[data-state="generating"] .poem-state { border-color: var(--accent); opacity: .5; }
+.poem-line[data-state="draft"] .poem-state { background: var(--accent); border-color: var(--accent); opacity: .55; }
+.poem-line[data-state="baked"] .poem-state { background: var(--accent); border-color: var(--accent); }
+.poem-line[data-state="stale"] .poem-state { border-color: #df8a7d; border-style: dashed; }
+.poem-line[data-state="stale"] .poem-text { color: var(--ink-faint); font-style: italic; }
+
+/* Never let a draft pass for the poem. */
+.poem-banner {
+  margin: 8px 10px 0;
+  padding: 7px 9px;
+  border-left: 2px solid #df8a7d;
+  background: rgba(223, 138, 125, 0.07);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.poem-banner.hidden { display: none; }
+
+.bar-label {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.btn-quiet { background: transparent; border: 1px solid var(--line); color: var(--ink-dim); }
+.btn-quiet:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-faint); }
 
 /* ---- notation rail (right) ---- */
 .rail-right {
