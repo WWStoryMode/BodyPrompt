@@ -3,11 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "BodyPrompt — choreographic search across real and fixture motion providers.",
+  "description": "BodyPrompt \u2014 choreographic search across real and fixture motion providers.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test src/*.test.ts"
   },
   "dependencies": {
     "three": "^0.161.0"
