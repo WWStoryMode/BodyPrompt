@@ -1,13 +1,18 @@
-// Lab Bench — wires the prompt bar to the service and the renderer.
+// Lab Bench — wires the poem to the service and the renderer.
 //
-//   type a phrase  ->  POST /generate  ->  canonical motion  ->  three.js playback
+//   write lines  ->  POST /generate  ->  canonical motion  ->  three.js playback
+//
+// Each line of the poem is a prompt. A line can be **drafted** on its own — fast, and blind
+// to its neighbours — or the whole poem can be **baked**, generated in one pass so the body
+// carries from one sentence into the next. Those are different things and this file keeps
+// them apart: see `updateBanner`.
 //
 // The selected backend may be real Kimodo or an explicitly-labelled fixture. This file
 // only orchestrates DOM + fetch + renderer; the drawing lives in renderer.ts.
 
 import "./style.css";
 import { StickFigureRenderer } from "./renderer";
-import { Lineage, renderTree } from "./lineage";
+import { Poem, suggestedDuration, type PoemLine } from "./poem";
 import {
   renderChronophotograph,
   renderFloorPath,
@@ -24,7 +29,6 @@ const VARIANTS = 4;
 
 // ---- DOM ----
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const promptEl = $<HTMLInputElement>("prompt");
 const modelEl = $<HTMLSelectElement>("model");
 const durationEl = $<HTMLSelectElement>("duration");
 const stepsEl = $<HTMLInputElement>("steps");
@@ -45,6 +49,9 @@ stepsEl.addEventListener("blur", () => {
   stepsEl.value = n === null ? "" : String(n);
 });
 const generateEl = $<HTMLButtonElement>("generate");
+const bakeEl = $<HTMLButtonElement>("bake");
+const poemLinesEl = $<HTMLDivElement>("poem-lines");
+const poemBannerEl = $<HTMLDivElement>("poem-banner");
 const generationStatusEl = $<HTMLSpanElement>("generation-status");
 const stageEl = $<HTMLDivElement>("stage");
 const telemetryEl = $<HTMLDivElement>("telemetry");
@@ -53,7 +60,6 @@ const playPauseEl = $<HTMLButtonElement>("playpause");
 const scrubEl = $<HTMLInputElement>("scrub");
 const counterEl = $<HTMLSpanElement>("counter");
 const ghostsEl = $<HTMLInputElement>("ghosts");
-const lineageSvgEl = document.getElementById("lineage-svg") as unknown as SVGSVGElement;
 const notationSvgEl = document.getElementById("notation-svg") as unknown as SVGSVGElement;
 const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElement;
 const appEl = $<HTMLDivElement>("app");
@@ -77,22 +83,202 @@ let playheads: ((frame: number) => void)[] = [];
 let current: CanonicalMotion | null = null;
 let lastFrame = 0;
 
-// ---- renderer + lineage ----
+// ---- renderer + the poem ----
 const renderer = new StickFigureRenderer(stageEl);
-const lineage = new Lineage();
+const poem = new Poem(["a body remembers a place it cannot return to"]);
+
+// ---- the poem editor ----
+//
+// Rows are reused across renders rather than rebuilt, so typing does not lose the caret.
+// Only a line's *state* and its neighbours change on a keystroke; the input itself is
+// left alone unless the model disagrees with what is on screen.
+
+const rows = new Map<number, HTMLDivElement>();
+
+const STATE_TITLE: Record<string, string> = {
+  empty: "not generated yet",
+  generating: "generating…",
+  draft: "drafted alone — the body will jump into the next line",
+  baked: "baked — carries on from the line before it",
+  stale: "edited since it was generated",
+};
+
+function buildRow(line: PoemLine): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "poem-line";
+  row.dataset.id = String(line.id);
+
+  const dot = document.createElement("span");
+  dot.className = "poem-state";
+
+  const text = document.createElement("input");
+  text.className = "poem-text";
+  text.spellcheck = false;
+  text.placeholder = "a line of the poem…";
+
+  const duration = document.createElement("input");
+  duration.className = "poem-dur";
+  duration.type = "number";
+  duration.min = "2";
+  duration.max = "10";
+  duration.title = "seconds for this line — blank follows the line's length";
+
+  const loop = document.createElement("button");
+  loop.className = "poem-loop";
+  loop.type = "button";
+  loop.textContent = "↻";
+  loop.title = "loop this line";
+
+  text.addEventListener("input", () => {
+    poem.setText(line.id, text.value);
+    // The suggestion moves with the words while the box is empty.
+    duration.placeholder = String(suggestedDuration(text.value));
+    renderPoem();
+    updateBanner();
+  });
+  text.addEventListener("focus", () => selectLine(line.id));
+  text.addEventListener("keydown", (e) => onLineKey(e, line.id, text));
+
+  duration.addEventListener("change", () => {
+    const value = duration.value.trim();
+    poem.setDuration(line.id, value ? Number(value) : null);
+    renderPoem();
+    updateBanner();
+  });
+
+  loop.addEventListener("click", () => toggleLoopLine(line.id));
+  row.addEventListener("dblclick", () => jumpToLine(line.id));
+
+  row.append(dot, text, duration, loop);
+  return row;
+}
+
+function renderPoem(): void {
+  for (const [id, row] of rows) {
+    if (!poem.get(id)) {
+      row.remove();
+      rows.delete(id);
+    }
+  }
+  poem.all.forEach((line, at) => {
+    let row = rows.get(line.id);
+    if (!row) {
+      row = buildRow(line);
+      rows.set(line.id, row);
+    }
+    if (poemLinesEl.children[at] !== row) {
+      poemLinesEl.insertBefore(row, poemLinesEl.children[at] ?? null);
+    }
+    const text = row.querySelector<HTMLInputElement>(".poem-text")!;
+    const duration = row.querySelector<HTMLInputElement>(".poem-dur")!;
+    // Never overwrite what someone is typing.
+    if (document.activeElement !== text && text.value !== line.text) text.value = line.text;
+    if (document.activeElement !== duration) {
+      duration.value = line.durationSeconds === null ? "" : String(line.durationSeconds);
+    }
+    duration.placeholder = String(suggestedDuration(line.text));
+    row.dataset.state = line.state;
+    row.classList.toggle("selected", line.id === poem.selectedId);
+    row.classList.toggle("looping", loopingLineId === line.id);
+    row.querySelector(".poem-state")!.setAttribute("title", STATE_TITLE[line.state] ?? "");
+  });
+}
+
+function selectLine(id: number): void {
+  if (poem.selectedId === id) return;
+  poem.selectedId = id;
+  renderPoem();
+  // The registers and the ghost-cloud follow the line being worked on.
+  if (!poem.bakeIsCurrent) showCurrent({ keepPlayhead: true });
+}
+
+function focusLine(id: number, caret?: number): void {
+  const text = rows.get(id)?.querySelector<HTMLInputElement>(".poem-text");
+  if (!text) return;
+  text.focus();
+  if (caret !== undefined) text.setSelectionRange(caret, caret);
+}
+
+/** Editor keys. Enter splits, Backspace at the start merges, arrows move between lines. */
+function onLineKey(e: KeyboardEvent, id: number, text: HTMLInputElement): void {
+  const index = poem.indexOf(id);
+  const lines = poem.all;
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const tail = text.value.slice(text.selectionStart ?? text.value.length);
+    if (tail) {
+      poem.setText(id, text.value.slice(0, text.selectionStart ?? 0));
+      text.value = poem.get(id)!.text;
+    }
+    const created = poem.insertAfter(id, tail);
+    renderPoem();
+    updateBanner();
+    focusLine(created.id, 0);
+  } else if (e.key === "Backspace" && text.selectionStart === 0 && text.selectionEnd === 0) {
+    const previous = lines[index - 1];
+    if (!previous) return;
+    e.preventDefault();
+    const caret = previous.text.length;
+    poem.setText(previous.id, previous.text + text.value);
+    poem.remove(id);
+    renderPoem();
+    updateBanner();
+    focusLine(previous.id, caret);
+  } else if (e.key === "ArrowUp" && lines[index - 1]) {
+    e.preventDefault();
+    focusLine(lines[index - 1].id, lines[index - 1].text.length);
+  } else if (e.key === "ArrowDown" && lines[index + 1]) {
+    e.preventDefault();
+    focusLine(lines[index + 1].id, lines[index + 1].text.length);
+  } else if (e.key === "Escape") {
+    text.blur();
+  }
+}
+
+// Which line, if any, the playhead is pinned inside.
+let loopingLineId: number | null = null;
+
+function toggleLoopLine(id: number): void {
+  loopingLineId = loopingLineId === id ? null : id;
+  const at = poem.written.findIndex((line) => line.id === id);
+  if (loopingLineId !== null && at >= 0) {
+    renderer.setLoop("line", at);
+    renderer.seekSegment(at);
+  } else {
+    renderer.setLoop("whole");
+  }
+  renderPoem();
+}
+
+function jumpToLine(id: number): void {
+  const at = poem.written.findIndex((line) => line.id === id);
+  if (at >= 0) renderer.seekSegment(at);
+}
+
+/**
+ * Say plainly what is on the stage.
+ *
+ * A drafted poem and a baked one look similar and mean different things: drafts are
+ * generated blind to each other, so the body jumps between lines. Nothing smooths that
+ * over, and this banner refuses to let it pass unremarked.
+ */
+function updateBanner(): void {
+  let message = "";
+  if (poem.bakedMotion && !poem.bakeIsCurrent) {
+    message =
+      "the poem has changed since it was baked — what is playing is the older reading";
+  } else if (!poem.bakedMotion && poem.written.some((line) => line.motion)) {
+    message =
+      "drafted lines: each was generated on its own, so the body jumps between them. " +
+      "Bake for the real reading.";
+  }
+  poemBannerEl.textContent = message;
+  poemBannerEl.classList.toggle("hidden", !message);
+}
 
 let userScrubbing = false;
 
-// Redraw the lineage tree; clicking a node replays its stored motion (no re-fetch).
-function drawTree(): void {
-  renderTree(lineageSvgEl, lineage, (id) => {
-    const node = lineage.select(id);
-    if (!node) return;
-    promptEl.value = node.prompt; // so refining from here branches off this node
-    showMotion(node.motion);
-    drawTree();
-  });
-}
+
 
 // ---- the triptych: one prompt, three models ----
 //
@@ -125,7 +311,9 @@ function triRenderer(modelId: string, accent: number): StickFigureRenderer {
 
 /** Ask all three models the same question, at once. */
 async function generateTriptych(): Promise<void> {
-  const prompt = promptEl.value;
+  // One line, three models. The triptych compares models on a single phrase, so it takes
+  // the line being worked on rather than the whole poem.
+  const prompt = poem.selected?.text.trim() || poem.written[0]?.text.trim() || "";
   await Promise.all(
     TRI_MODELS.map(async ({ id, accent }) => {
       const footEl = document.getElementById(`tri-foot-${id}`) as HTMLDivElement;
@@ -207,9 +395,9 @@ function setReading(on: boolean): void {
 
 // ---- performance mode ----
 //
-// Not a separate page: the same session, the same lineage. The performer keeps working
-// (typing, generating, branching) while the room sees only the body, the phrase and the
-// score. Slowed down, because a human has to be able to follow and re-embody it.
+// Not a separate page: the same session, the same poem. The performer keeps working
+// (writing, drafting, baking) while the room sees only the body, the line it is
+// answering, and the score. Slowed down, because a human has to be able to follow it.
 
 const TEMPOS = [0.5, 0.25, 1]; // performance opens at half speed; T cycles
 const FULL_SPEED = TEMPOS.indexOf(1);
@@ -247,28 +435,57 @@ function cycleTempo(): void {
   setTempo(TEMPOS[tempoIdx]);
 }
 
-// Load a motion into the stage + telemetry. Shared by Generate and node-replay.
-// A motion carries its own ghost-cloud in `variants`, so replaying a past node
-// restores that node's cloud too.
-function showMotion(motion: CanonicalMotion): void {
+/**
+ * Put the poem on the stage.
+ *
+ * A current bake plays as one continuous motion. Otherwise the drafted lines play in order,
+ * as separate clips — which is exactly what they are, seams and all.
+ */
+function showCurrent(opts: { keepPlayhead?: boolean } = {}): void {
+  const baked = poem.bakeIsCurrent ? poem.bakedMotion : poem.bakedMotion;
+  const usingBake = poem.bakeIsCurrent && baked !== null;
+  const drafts = poem.written
+    .map((line) => line.motion)
+    .filter((motion): motion is CanonicalMotion => motion !== null);
+
+  if (usingBake && baked) {
+    current = baked;
+    renderer.loadSequence([baked], { keepPlayhead: opts.keepPlayhead });
+  } else if (baked && drafts.length === 0) {
+    // Edited since baking, with nothing drafted to show instead: keep the old reading on
+    // the stage rather than going blank, and let the banner say it is out of date.
+    current = baked;
+    renderer.loadSequence([baked], { keepPlayhead: opts.keepPlayhead });
+  } else if (drafts.length) {
+    const selected = poem.selected;
+    // The ghost-cloud is a per-line instrument: it shows the line being worked on.
+    const ghosts = selected?.motion?.variants ?? [];
+    current = selected?.motion ?? drafts[0];
+    renderer.loadSequence(drafts, { ghosts, keepPlayhead: opts.keepPlayhead });
+  } else {
+    return; // nothing generated yet — the hint is still on screen
+  }
+
   hintEl.classList.add("hidden");
-  current = motion;
-  renderer.load(motion);
   renderer.setGhostsVisible(ghostsEl.checked);
-
-  // rebuild the legible reduction for this motion
   buildScore();
+  updateBanner();
+  showTelemetry(usingBake);
+}
 
-  // the phrase the room is watching the body search for
-  perfPhraseEl.textContent = `“${motion.prompt}”`;
-
+function showTelemetry(usingBake: boolean): void {
+  const motion = current;
+  if (!motion) return;
   const ghostCount = motion.variants?.length ?? 0;
   const provenance = motion.provenance;
   const safe = (value: unknown) =>
     String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const lineCount = poem.written.length;
   telemetryEl.innerHTML =
     `<span class="k">model</span> ${safe(motion.model)}<br>` +
-    `<span class="k">prompt</span> “${safe(motion.prompt)}”<br>` +
+    `<span class="k">poem</span> ${lineCount} line${lineCount === 1 ? "" : "s"} · ` +
+    // The distinction the whole design turns on, stated on the stage itself.
+    (usingBake ? "baked · continuous" : "drafted · lines generated apart") + `<br>` +
     `<span class="k">seed</span> ${motion.seed}<br>` +
     `<span class="k">joints</span> ${motion.joints.length} · ${motion.skeleton}<br>` +
     (provenance
@@ -286,7 +503,10 @@ function showMotion(motion: CanonicalMotion): void {
     (motion.stub ? `<span class="stub">stub · hand-authored fixture (no ML)</span>` : "");
 }
 
-renderer.onFrame(({ frame, total, fps, playing }) => {
+// Which line the playhead was inside last tick, so the DOM is only touched when it moves.
+let shownSegment = -1;
+
+renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
   lastFrame = frame;
   playPauseEl.textContent = playing ? "Pause" : "Play";
   counterEl.textContent = `frame ${frame} / ${total - 1}  ·  ${fps} fps`;
@@ -295,6 +515,14 @@ renderer.onFrame(({ frame, total, fps, playing }) => {
   }
   // walk the "now" marker through every open register
   for (const set of playheads) set(frame);
+
+  if (segmentIndex !== shownSegment) {
+    shownSegment = segmentIndex;
+    const line = poem.written[segmentIndex];
+    // The room reads the sentence the body is answering right now, not the whole poem.
+    if (line) perfPhraseEl.textContent = `“${line.text}”`;
+    for (const [id, row] of rows) row.classList.toggle("playing", id === line?.id);
+  }
 });
 
 // ---- generate ----
@@ -309,50 +537,92 @@ async function responseError(res: Response): Promise<string> {
 
 function setGenerating(on: boolean, message = ""): void {
   generateEl.disabled = on;
-  generateEl.textContent = on ? "…" : "Generate";
+  bakeEl.disabled = on;
   generationStatusEl.textContent = message;
   generationStatusEl.className = `generation-status${on ? " busy" : ""}`;
 }
 
-async function generate(): Promise<void> {
-  const started = performance.now();
-  setGenerating(true, "generating…");
-  try {
-    const res = await fetch(`${API_BASE}/generate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model: modelEl.value,
-        prompt: promptEl.value,
-        variants: VARIANTS, // ask for the ghost-cloud alongside the primary
-        duration_seconds: Number(durationEl.value),
-        denoising_steps: chosenSteps(),
-      }),
-    });
-    if (!res.ok) throw new Error(await responseError(res));
-    const motion = (await res.json()) as CanonicalMotion;
-    if (!motion.frames?.length) throw new Error("motion had no frames");
+function generationFailed(err: unknown, keeping: string): void {
+  hintEl.classList.remove("hidden");
+  hintEl.innerHTML =
+    `Generation failed: ${String((err as Error).message)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}.<br>` +
+    keeping;
+  generationStatusEl.textContent = "failed";
+  generationStatusEl.className = "generation-status error";
+}
 
-    // A new attempt becomes a child of the currently-selected node (root if none) —
-    // refining from the tip extends a line; generating from an older node branches.
-    lineage.add(motion, lineage.currentId);
-    showMotion(motion);
-    drawTree();
+async function post(body: unknown): Promise<CanonicalMotion> {
+  const res = await fetch(`${API_BASE}/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await responseError(res));
+  const motion = (await res.json()) as CanonicalMotion;
+  if (!motion.frames?.length) throw new Error("motion had no frames");
+  return motion;
+}
+
+/**
+ * Draft one line on its own.
+ *
+ * Fast, and deliberately blind to the rest of the poem: this line does not know where the
+ * body will be when it arrives. That is what `Bake` is for.
+ */
+async function draftLine(id: number | null = poem.selectedId): Promise<void> {
+  const line = id === null ? undefined : poem.get(id);
+  if (!line || !line.text.trim()) return;
+  const started = performance.now();
+  poem.markGenerating(line.id);
+  renderPoem();
+  setGenerating(true, "drafting…");
+  try {
+    const motion = await post({
+      model: modelEl.value,
+      prompt: line.text.trim(),
+      // The ghost-cloud is per line, so it is only asked for when it is switched on.
+      variants: ghostsEl.checked ? VARIANTS : 1,
+      duration_seconds: poem.durationOf(line),
+      denoising_steps: chosenSteps(),
+    });
+    poem.recordDraft(line.id, motion);
+    showCurrent();
     generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
   } catch (err) {
-    hintEl.classList.remove("hidden");
-    hintEl.innerHTML =
-      `Generation failed: ${String((err as Error).message)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}.<br>` +
-      `The previous motion is still in the lineage.`;
-    generationStatusEl.textContent = "failed";
-    generationStatusEl.className = "generation-status error";
+    poem.setText(line.id, line.text); // knocks it out of "generating"
+    generationFailed(err, "The line is unchanged.");
   } finally {
-    generateEl.disabled = false;
-    generateEl.textContent = "Generate";
-    if (!generationStatusEl.classList.contains("error")) {
-      generationStatusEl.className = "generation-status";
-    }
+    renderPoem();
+    setGenerating(false);
+  }
+}
+
+/**
+ * Bake the whole poem: every line in one pass, each conditioned on the body the line
+ * before it left behind. This is the real reading.
+ */
+async function bake(): Promise<void> {
+  const lines = poem.toLines();
+  if (!lines.length) return;
+  const started = performance.now();
+  setGenerating(true, `baking ${lines.length} lines…`);
+  try {
+    const motion = await post({
+      model: modelEl.value,
+      lines,
+      denoising_steps: chosenSteps(),
+    });
+    poem.recordBake(motion);
+    loopingLineId = null;
+    renderer.setLoop("whole");
+    showCurrent();
+    generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
+  } catch (err) {
+    generationFailed(err, "The previous reading is still on the stage.");
+  } finally {
+    renderPoem();
+    setGenerating(false);
   }
 }
 
@@ -385,16 +655,15 @@ async function refreshCapabilities(): Promise<void> {
 }
 
 // ---- events ----
-// One prompt bar drives whichever instrument is open.
-function generateHere(): void {
-  if (comparing) generateTriptych();
-  else generate();
+// The bar drives whichever instrument is open: the triptych compares one line across
+// models, the bench drafts that line into the poem.
+function draftHere(): void {
+  if (comparing) void generateTriptych();
+  else void draftLine();
 }
 
-generateEl.addEventListener("click", generateHere);
-promptEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") generateHere();
-});
+generateEl.addEventListener("click", draftHere);
+bakeEl.addEventListener("click", () => void bake());
 triptychEl.addEventListener("click", () => setComparing(!comparing));
 registersBtnEl.addEventListener("click", () => setReading(!reading));
 
@@ -418,19 +687,22 @@ scrubEl.addEventListener("change", () => {
 
 performEl.addEventListener("click", () => setPerforming(!performing));
 
-// Stage shortcuts. Ignored while typing a prompt — except Escape, which always gets you
-// out (you do not want to be hunting for a mouse in front of an audience).
-window.addEventListener("keydown", (e) => {
-  const typing = document.activeElement === promptEl;
+// Stage shortcuts. Ignored while typing — which, now that the instrument is an editor, is
+// most of the time. Escape always gets you out: you do not want to be hunting for a mouse
+// in front of an audience.
+const isTyping = (): boolean =>
+  document.activeElement instanceof HTMLInputElement ||
+  document.activeElement instanceof HTMLTextAreaElement;
 
+window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (performing) setPerforming(false);
     else if (comparing) setComparing(false);
     else if (reading) setReading(false);
-    else promptEl.blur();
+    else (document.activeElement as HTMLElement | null)?.blur();
     return;
   }
-  if (typing) return;
+  if (isTyping()) return;
 
   switch (e.key.toLowerCase()) {
     case " ":
@@ -453,13 +725,23 @@ window.addEventListener("keydown", (e) => {
       ghostsEl.checked = !ghostsEl.checked;
       renderer.setGhostsVisible(ghostsEl.checked);
       break;
+    case "d":
+      void draftLine();
+      break;
+    case "b":
+      void bake();
+      break;
+    case "l":
+      if (poem.selectedId !== null) toggleLoopLine(poem.selectedId);
+      break;
   }
 });
 
-// Draw the (empty) tree, then generate once on load so the stage isn't empty and the
-// search has a root (fails gracefully if the service is down).
-drawTree();
-void refreshCapabilities().then(generate);
+// Draw the poem, then draft its first line so the stage is not empty (and fail gracefully
+// if the service is down). Bake is a deliberate act, never something that just happens.
+renderPoem();
+updateBanner();
+void refreshCapabilities().then(() => draftLine());
 
 // Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
 // projector without fumbling through chrome in front of a room); ?compare=1 opens the

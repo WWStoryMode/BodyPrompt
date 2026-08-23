@@ -18,5 +18,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests import node: built-ins and are run by `npm test` (Node executes TypeScript
+  // directly). They are excluded here because @types/node cannot currently be installed —
+  // the dependency tree has a pre-existing typedoc/rollup peer conflict — and the app
+  // build must not depend on resolving that.
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -83,34 +83,47 @@ Around the stage:
 - **Telemetry** (top left) — model, prompt, seed, joint count, how many other seeds are in the
   cloud, and an amber `stub · hand-authored fixture (no ML)` line. That last line is there so
   that no screenshot of this app can be honestly mistaken for model output.
-- **Lineage rail** (left) — the search so far. See below.
+- **Poem rail** (left) — the score you are writing. See below.
 - **Notation rail** (right) — two of the four registers, small: the notation strip and the
   floor path. <kbd>R</kbd> opens all four, large.
 - **Transport** (bottom) — play/pause, a scrub bar, the ghost-cloud toggle, and a frame
   counter. Scrubbing moves the figure, the ghosts, and every open register together.
 
-### The prompt lineage tree — the core contribution
+### The poem — the core contribution
 
-**Every prompt revision is kept.** Generating does not replace what came before; it adds a
-child node. The search branches, and nothing is undone.
+**Each line is a prompt, and the poem is the score.** Write on the left; the body answers
+line by line and carries from one into the next.
 
-- **Generate** from the current node → extends the line.
-- **Click a past node**, then Generate → **branches** from there. The old line stays.
-- Clicking a node **replays its stored motion** — no re-fetch, and it restores that node's own
-  ghost-cloud too.
+- **Enter** starts a new line, **Backspace** at the start of a line merges it into the one
+  above, **↑↓** move between lines — it behaves like a text editor, because that is what
+  writing a poem needs.
+- **Draft line** (`D`) generates the selected line **on its own**. Fast, and blind to its
+  neighbours: the body will visibly jump where one drafted line meets the next.
+- **Bake** (`B`) generates the **whole poem in one pass**, each line conditioned on the body
+  the previous line left behind. This is the real reading, and the only one that is
+  continuous.
+- **Double-click** a line to jump the playhead to it; **↻** loops that line alone so you can
+  watch it while you rewrite it.
+- **Duration** sits at the end of each line. Leave it blank and it follows the line's length;
+  type a number to fix it.
 
-The tree is the artefact, not the leftovers. In performance it is the set: the audience
-watches not just generated movement but the *evolution of thought* — how a phrase mutated,
-where it branched, which possibility was followed and which was left open.
+The dot at the left of each line says what it is: hollow = not generated, faint amber =
+drafted alone, solid amber = baked and carrying through, dashed red = edited since it was
+generated.
 
-### The ghost-cloud
+**Editing a line changes the future, not the past.** Because each baked line is generated
+from the body the line before it left, changing one line invalidates it *and every line
+after it* — the lines above stay solid. That is not caution; it is what the model does, and
+watching it happen is part of what the instrument is for.
 
-One prompt, many seeds. The solid amber figure is the primary motion; the translucent blue
-figures around it are three siblings with different seeds. Toggle with <kbd>G</kbd> or the
-checkbox.
+A banner appears whenever what is playing is not the baked poem — either because the lines
+were drafted separately, or because the poem has been edited since. It is there so a draft
+can never quietly pass for the finished reading.
 
-Where the lineage tree shows *the search across time*, the ghost-cloud shows *the possibilities
-at one moment*. It is hidden in the triptych and the registers view, because there it would
+Where the poem shows *the search across time*, the ghost-cloud shows *the possibilities
+at one moment*. It belongs to **one line**: switch it on and drafting a line generates four
+readings of that line, shown around it. A baked poem carries no cloud — four readings of a
+five-line poem would take minutes, and the model cannot re-roll a single line on its own. It is hidden in the triptych and the registers view, because there it would
 only add noise — the ghost-cloud compares **seeds**, the triptych compares **models**.
 
 *(In v0 this is a seeded perturbation, not a model sampling. See [`v0-stub.md`](v0-stub.md).)*
@@ -196,13 +209,13 @@ that were out of step with each other would tell you nothing.
 ## Performance mode — <kbd>P</kbd>
 
 The projectable stage, for the lecture performance. Not a separate page: the **same session,
-the same lineage.** The performer keeps working — typing, generating, branching — while the
+the same poem.** The performer keeps working — writing, drafting, baking — while the
 room sees only the body, the phrase and the score.
 
 What changes: the instrument chrome falls away, the background darkens, a spotlight gathers the
 eye onto the body, the phrase goes large beneath it, and **playback drops to half speed** —
 because a human has to be able to *follow and re-embody it*. The score gets thicker strokes and
-bigger labels: it has to be readable by a body, from across a room. The lineage keeps growing in
+bigger labels: it has to be readable by a body, from across a room. The poem keeps growing in
 the corner — research log as set.
 
 <kbd>T</kbd> cycles the tempo, <kbd>space</kbd> plays and pauses, <kbd>esc</kbd> gets you out.

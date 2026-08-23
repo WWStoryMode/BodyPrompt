@@ -21,19 +21,15 @@
       </div>
 
       <div class="promptbar">
-        <input
-          id="prompt"
-          class="prompt-input"
-          value="a body remembers a place it cannot return to"
-          spellcheck="false"
-        />
+        <!-- The poem is the input now; this bar carries how it gets generated. -->
+        <span class="bar-label">the poem is written on the left</span>
         <select id="model" class="model-select" aria-label="Motion model">
           <option value="kimodo">Kimodo · checking…</option>
           <option value="snapmogen">SnapMoGen · checking…</option>
           <option value="language-of-motion">Language of Motion · checking…</option>
         </select>
         <label class="duration">
-          <span>duration</span>
+          <span>default&nbsp;dur</span>
           <select id="duration" class="model-select">
             <option value="2">2 s</option>
             <option value="3">3 s</option>
@@ -61,19 +57,29 @@
             aria-label="Denoising steps"
           />
         </label>
-        <button id="generate" class="btn">Generate</button>
+        <!-- Draft: this line alone, fast, blind to its neighbours.
+             Bake: the whole poem in one pass, each line carrying on from the last.
+             They are different things and the buttons do not pretend otherwise. -->
+        <button id="generate" class="btn btn-quiet" title="Generate the selected line alone (D)">
+          Draft line
+        </button>
+        <button id="bake" class="btn" title="Generate the whole poem continuously (B)">Bake</button>
         <span id="generation-status" class="generation-status" aria-live="polite"></span>
       </div>
 
       <div class="body">
-        <!-- Prompt lineage: every Generate adds a node; click one to replay it. -->
-        <aside class="rail">
-          <div class="rail-title">lineage · the search</div>
+        <!-- The poem: each line is a prompt, and the body carries from one into the next.
+             Every line keeps its own history, so a revision never destroys what came before. -->
+        <aside class="rail rail-poem">
+          <div class="rail-title">poem · the score</div>
+          <!-- Shown whenever what is playing is not the baked poem. -->
+          <div id="poem-banner" class="poem-banner hidden" role="status"></div>
           <div class="rail-scroll">
-            <svg id="lineage-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="poem-lines" class="poem-lines"></div>
           </div>
           <div class="rail-hint">
-            refine &amp; <b>Generate</b> to extend · click a past node to branch from it
+            <b>enter</b> new line · <b>↑↓</b> move · <b>double-click</b> to jump ·
+            <b>↻</b> loop one line
           </div>
         </aside>
 
@@ -92,7 +98,7 @@
           </div>
 
           <div id="hint" class="hint">
-            Start the service, then click <b>Generate</b>.<br />
+            Write a line on the left, then <b>Draft line</b> — or <b>Bake</b> the whole poem.<br />
             <code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>
           </div>
         </div>
