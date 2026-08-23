@@ -8,7 +8,7 @@ from functools import lru_cache
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .adapter import adapt_motion
 
@@ -16,8 +16,17 @@ MODEL_VERSION = "Kimodo-SOMA-RP-v1.1"
 FPS = 30
 
 
-class GenerateRequest(BaseModel):
+class Line(BaseModel):
+    """One sentence of a poem: a prompt, and how long the body has to answer it."""
+
     prompt: str = Field(min_length=1)
+    duration_seconds: float = Field(default=5.0, ge=2.0, le=10.0)
+
+
+class GenerateRequest(BaseModel):
+    # Exactly one of `prompt` (one phrase) or `lines` (a poem) — see the validator below.
+    prompt: str | None = Field(default=None, min_length=1)
+    lines: list[Line] | None = Field(default=None, min_length=1)
     duration_seconds: float = Field(default=5.0, ge=2.0, le=10.0)
     variants: int = Field(default=1, ge=1, le=4)
     seed: int = Field(ge=0, lt=2**31)
@@ -30,6 +39,32 @@ class GenerateRequest(BaseModel):
     # its noise schedule in this many hops, so fewer steps is a coarser path to a fully
     # denoised motion, not a truncated one. None means "use the configured default".
     denoising_steps: int | None = Field(default=None, ge=1, le=500)
+    # Frames Kimodo overlaps between consecutive lines to blend them. Its own default is 5.
+    # These frames belong to both lines and to neither: with post-processing on they are
+    # generated under the *next* line's prompt, so they are reported rather than hidden.
+    transition_frames: int = Field(default=5, ge=1, le=30)
+
+    @model_validator(mode="after")
+    def _one_shape_or_the_other(self) -> "GenerateRequest":
+        """A request is either one phrase or a poem, never both and never neither.
+
+        Guessing which wins would make the contract ambiguous at exactly the point where
+        the answer changes what the body does.
+        """
+        if (self.prompt is None) == (self.lines is None):
+            raise ValueError("send either 'prompt' or 'lines', not both and not neither")
+        if self.lines is not None:
+            if self.variants != 1:
+                # The ghost-cloud is a per-line instrument: four readings of a five-line
+                # poem would cost minutes, and Kimodo cannot re-roll one line alone.
+                raise ValueError("variants apply to a single prompt, not to a poem")
+            shortest = min(round(line.duration_seconds * FPS) for line in self.lines)
+            if self.transition_frames >= shortest:
+                raise ValueError(
+                    f"transition_frames ({self.transition_frames}) must be shorter than the "
+                    f"shortest line ({shortest} frames)"
+                )
+        return self
 
 
 # Whether the text-embedding cache is active, reported by /health. A miss here costs speed
@@ -167,31 +202,110 @@ def _one(model, req: GenerateRequest, seed: int) -> dict:
         # Kimodo's own CLI always passes this for the same reason.
         num_samples=1,
     )
+    return _adapt(model, output, prompt=req.prompt, seed=seed)
+
+
+def _adapt(model, output, *, prompt: str, seed: int) -> dict:
+    """Turn one Kimodo output dict into canonical motion.
+
+    Shared by the single-phrase and poem paths: `multi_prompt` returns the same keys and
+    the same tensor shapes as a single call, just longer, so the SOMA adapter needs no
+    knowledge of which one produced it.
+    """
     if not isinstance(output, dict):
         raise RuntimeError(f"unexpected Kimodo output type: {type(output).__name__}")
 
     positions = _numpy(output["posed_joints"])
     rotations = _numpy(output["local_rot_mats"])
-    # num_samples=1 above keeps a batch dimension of one; strip it.
+    # num_samples=1 keeps a batch dimension of one; strip it.
     if positions.ndim == 4:
         positions = positions[0]
     if rotations.ndim == 5:
         rotations = rotations[0]
     skeleton = _output_skeleton(model)
-    motion = adapt_motion(
+    return adapt_motion(
         positions,
         rotations,
         _joint_names(skeleton),
         fps=FPS,
-        prompt=req.prompt,
+        prompt=prompt,
         seed=seed,
         skeleton_name=str(getattr(skeleton, "name", "") or ""),
     )
+
+
+def _segments(lines: list[Line], transition_frames: int) -> list[dict]:
+    """Where each line begins and ends in the stitched motion.
+
+    Kimodo does not report this — it returns one flat motion — but the arithmetic is exact:
+    the total frame count equals the sum of the requested per-line counts. The trailing
+    `transition_frames` of every line except the last are shared with the line that follows,
+    and are recorded rather than quietly attributed to one line or the other.
+    """
+    segments: list[dict] = []
+    start = 0
+    for index, line in enumerate(lines):
+        frames = round(line.duration_seconds * FPS)
+        segments.append({
+            "index": index,
+            "prompt": line.prompt,
+            "start_frame": start,
+            "end_frame": start + frames,
+            "transition_frames": transition_frames if index < len(lines) - 1 else 0,
+            "duration_seconds": line.duration_seconds,
+        })
+        start += frames
+    return segments
+
+
+def _poem(model, req: GenerateRequest) -> dict:
+    """Generate every line as one continuous motion, stitched by Kimodo.
+
+    Each line is conditioned on the decoded tail and heading of the line before it, so the
+    body carries from one sentence into the next instead of restarting. That conditioning
+    is also why a single line cannot be re-rolled on its own: changing one line changes
+    every line after it.
+    """
+    import torch
+
+    lines = req.lines or []
+    torch.manual_seed(req.seed)
+    torch.cuda.manual_seed_all(req.seed)
+    steps = _denoising_steps(req)
+    # Both must be lists of matching length. Kimodo broadcasts a bare int across
+    # num_samples rather than across prompts, and zips prompts against frames — so a
+    # mismatch silently drops lines instead of failing.
+    prompts = [line.prompt for line in lines]
+    num_frames = [round(line.duration_seconds * FPS) for line in lines]
+    output = model(
+        prompts=prompts,  # raw on purpose, as in the single-phrase path
+        num_frames=num_frames,
+        num_denoising_steps=steps,
+        multi_prompt=True,
+        num_transition_frames=req.transition_frames,
+        post_processing=req.post_processing,
+        num_samples=1,
+    )
+    motion = _adapt(model, output, prompt="\n".join(prompts), seed=req.seed)
+    expected = sum(num_frames)
+    if len(motion["frames"]) != expected:
+        # Silent truncation is Kimodo's failure mode here, so check rather than trust.
+        raise RuntimeError(
+            f"Kimodo returned {len(motion['frames'])} frames for a poem of {expected}; "
+            f"{len(prompts)} lines may not have all been generated"
+        )
+    motion["segments"] = _segments(lines, req.transition_frames)
+    return motion
+
+
+def _stamp(motion: dict, req: GenerateRequest, *, multi_prompt: bool) -> dict:
+    """Record what was actually done, beside the motion it was done to."""
     motion["post_processing"] = req.post_processing
-    # Report the count actually used. Step count shifts the motion by a meaningful
-    # fraction of sibling variance, so a motion that cannot say which it used is a
-    # motion whose ghost-cloud cannot be read.
-    motion["denoising_steps"] = steps
+    # Step count shifts the motion by a meaningful fraction of sibling variance, so a
+    # motion that cannot say which it used is a motion whose ghost-cloud cannot be read.
+    motion["denoising_steps"] = _denoising_steps(req)
+    motion["multi_prompt"] = multi_prompt
+    motion["transition_frames"] = req.transition_frames if multi_prompt else None
     return motion
 
 
@@ -220,7 +334,12 @@ def health() -> dict:
 def generate(req: GenerateRequest) -> dict:
     try:
         model = get_model()
-        samples = [_one(model, req, req.seed + i) for i in range(req.variants)]
+        if req.lines is not None:
+            return _stamp(_poem(model, req), req, multi_prompt=True)
+        samples = [
+            _stamp(_one(model, req, req.seed + i), req, multi_prompt=False)
+            for i in range(req.variants)
+        ]
         primary = samples[0]
         if len(samples) > 1:
             primary["variants"] = samples[1:]
