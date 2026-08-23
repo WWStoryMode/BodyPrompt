@@ -69,20 +69,31 @@ movement itself, as the primary material of inquiry, is the point.
 
 ---
 
-## Core contribution — the Prompt Lineage Tree
+## Core contribution — the poem as score
 
 The single most important idea in BodyPrompt is not a model or a renderer — it is the way
 the **search itself is kept**.
 
-In an ordinary tool, revising a prompt *replaces* what came before. In BodyPrompt, **every
-prompt revision is retained as part of the choreography** — each edit spawns a child, the
-search branches, and nothing is undone. The branching search **becomes the artefact**: a
-map of an expanding landscape of possibilities rather than a single final answer.
+In an ordinary tool, revising a prompt *replaces* what came before. In BodyPrompt the search
+is written as a **poem**: each line is a prompt, and the body moves continuously from one
+line into the next rather than restarting at each one. The poem **becomes the artefact** —
+at once research log, score, and set. Every line keeps its own history, so a revision still
+never destroys what came before; the expanding landscape of possibilities lives inside each
+line, while the poem holds what is being made from them.
+
+The lines are not independent. Each is generated conditioned on the body the previous line
+left behind, so **editing a line changes the future and not the past**: the lines before an
+edit are untouched, and every line after it legitimately becomes something else. That
+causality is the choreography, and the instrument shows it rather than hiding it.
 
 In performance this matters twice over. The audience does not just watch generated
-movement — they watch the **evolution of thought**: how a phrase mutated, where it
-branched, which possibility was followed and which was left open. The lineage tree is at
-once research log, score, and set.
+movement — they watch the **evolution of thought**: the phrase the body is answering right
+now, lit as the movement reaches it, and the lines still waiting.
+
+> Until v2 this was a **branching lineage tree** — every revision a child node, the search
+> spreading outward. The tree answered *what was tried*; the poem answers *what is being
+> made*, which is the question the lecture performance actually asks. The retention
+> principle is unchanged; only its shape is.
 
 ---
 
@@ -92,14 +103,14 @@ The five screens in this repo are **mockups of research instruments**, each answ
 "how does this help the search?" — not "what feature is this?"
 
 ***All five screens now exist as a real, running app*** on stub data — the Lab Bench, the
-prompt-lineage tree, the variance ghost-cloud, all four notation registers, the multi-model
+poem editor, the variance ghost-cloud, all four notation registers, the multi-model
 triptych, and performance mode. See [Run it](#run-it) and Status. The mockups below are kept
 as the original statement of intent.
 
 | # | Instrument | What it lets the research do |
 |---|-----------|------------------------------|
 | 01 | **Lab bench** | The basic search instrument — explore how *different prompts* generate *different interpretations* of the same poetic intention. |
-| 02 | **Search instrument** | Visualises the **history of the search** — every prompt revision becomes part of the research (the lineage tree) rather than replacing prior attempts; variance is shown as a ghost-cloud. |
+| 02 | **Search instrument** | Visualises the **history of the search** — the poem retains every line and each line its own revisions, rather than replacing prior attempts; variance is shown as a ghost-cloud. |
 | 03 | **Triptych** | Compares how **different AI models interpret the same poetic intention**, each keeping its own native way of authoring. |
 | 04 | **Notation registers** | Makes generated movement **readable and comparable** — four notation registers — without relying on realistic human appearance. |
 | 05 | **Performance mode** | Supports **live collaborative search** between performer, audience and AI during a lecture performance. |
@@ -137,7 +148,7 @@ in front of an audience:
 3. **Generate movements** — the models offer several interpretations.
 4. **Compare outputs** — read them as notation, side by side.
 5. **Discuss discoveries** — what unexpected qualities appeared?
-6. **Refine the prompt** — reflection reshapes the next attempt; the lineage branches.
+6. **Refine the line** — reflection reshapes it, and every line after it in turn.
 7. **Repeat** — the search continues, live and visible.
 8. **Reflect** — on the expanding landscape the search has drawn.
 
@@ -159,7 +170,7 @@ in front of an audience:
 |---------|--------------------|-------|
 | **v0** | Research proposition + mock interfaces | ✓ done |
 | **v0.5** | First functional slice — the search loop runs on **stub** data (schema + renderer + service, no ML) | ✓ done |
-| **v2** | **Prompt lineage** — the branching search retained and navigable | ✓ done |
+| **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ◐ generating; editor in progress |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
@@ -168,7 +179,7 @@ in front of an audience:
 | **v5** | Open research platform — others can search too | |
 
 The research instruments were deliberately built **before** the model: the whole loop —
-prompt → branching lineage → variance → readable score — already runs on stub data, so v1
+prompt → retained search → variance → readable score — already runs on stub data, so v1
 only has to swap the stub for a model.
 
 The bridge from v0 to v1 is deliberately split: **v0.5 makes the pipeline real without any
@@ -187,7 +198,9 @@ those instruments rather than to v1, and are held until those versions are reope
   not an artefact to be normalised away. What remains open is offering *pelvis-aligned* as an
   optional view, so the ~0.15 m of genuine articulation difference can be examined on its own
   when that is the question being asked. An option, never the default.
-- **v2 — further lineage features**, scope still to be decided.
+- **Persistence.** Nothing is saved: a reload destroys the poem. The instrument is
+  deliberately session-shaped for now, and where a search should live — a file, the browser,
+  the service — is an open question rather than an oversight.
 
 ### Questions for the research, not the build
 
@@ -218,11 +231,12 @@ spine of it (everything except the models):
 - ✓ **Stick-figure renderer** (three.js) — plays a canonical motion as notation (joints,
   bones, trails, orbit camera), with the variance **ghost-cloud** overlaid.
   → [`frontend/app/`](frontend/app/).
-- ✓ **The research instruments** — the **prompt-lineage tree** (every revision branches
-  rather than replacing), and the **legible reduction**: four notation registers — a Marey
-  chronophotograph, a per-limb notation strip, a top-down floor path, and a Laban-inspired
-  score — all derived from the joint trajectories, none of them complete on its own.
-  → [`src/lineage.ts`](frontend/app/src/lineage.ts),
+- ✓ **The research instruments** — the **poem** (each line a prompt, each keeping its own
+  revisions rather than being replaced), and the **legible reduction**: four notation
+  registers — a Marey chronophotograph, a per-limb notation strip, a top-down floor path,
+  and a Laban-inspired score — all derived from the joint trajectories, none of them
+  complete on its own.
+  → [`src/poem.ts`](frontend/app/src/poem.ts),
   [`src/notation.ts`](frontend/app/src/notation.ts).
 - ◐ **Inference service** (FastAPI) — `POST /generate {model, prompt} → canonical motion`.
   Live as a **fixture stub** (no ML) so the search loop is real before any weights load.
@@ -343,7 +357,7 @@ instrument.
 
 Hit **Perform** (or press <kbd>P</kbd>) for the projectable stage: the instrument chrome
 falls away, the phrase goes large, playback slows to half speed to be followed by a body —
-but the **lineage keeps growing** and you can still type and generate live, in front of the
+but the **poem keeps growing** and you can still write and generate live, in front of the
 room. <http://localhost:5173/?perform=1> boots straight into it, for plugging into a projector.
 
 | key | |
@@ -367,7 +381,8 @@ real movement on its target GPU, calibrated and inside its latency budget. What 
 are questions for the research to answer with the instrument, not code still owed.**
 
 Working today: type a phrase → a 3D stick figure moves; every prompt branches into a
-**lineage tree** (nothing is overwritten); one prompt shows **many seeds** as a variance
+**poem** whose every line keeps its own history (nothing is overwritten); one line shows
+**many seeds** as a variance
 **ghost-cloud**; and the motion is reduced to four readable **notation registers** — a Marey
 **chronophotograph**, a **notation strip**, a **floor path**, and a **Laban-inspired score**.
 A pluggable `Generator` routes either to the five fixtures or to the isolated Kimodo worker.

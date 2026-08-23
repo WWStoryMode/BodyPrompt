@@ -105,10 +105,48 @@ line and slides each so the pelvis continues from the last. It records
 never be mistaken for a real continuous reading. Its joins move the root but not the limbs,
 which is exactly the artefact the table above measures.
 
+### 2026-08-23 — Stage B, the instrument
+
+The left rail stops being the lineage tree and becomes the poem: *poem on the left, body in
+the centre, notation on the right.* `src/lineage.ts` is gone; `src/poem.ts` holds the lines,
+each with its own `history`, so nothing is overwritten.
+
+**What an edit invalidates is the whole design.** Editing a line marks it stale and, if the
+poem was baked, every line after it — never the lines before. That is not caution, it is the
+model's own causality made visible: each baked line is generated from the body the previous
+line left behind. A **draft** behaves differently, because a draft is generated alone: an
+edit elsewhere leaves it as valid as it ever was, and only the edited line goes stale.
+Encoding both rules is what `poem.ts` is for, and what most of its tests check.
+
+**Playback stopped assuming one clip.** `renderer.ts` held a single motion, reset the
+playhead on load, and looped unconditionally — `if (this.frameFloat > last) this.frameFloat
+-= last;` was the entire end-of-clip behaviour. It now plays a timeline: one segmented clip
+for a bake, one clip per line for a draft, resolved the same way so "which line is the body
+answering" falls out of both. Looping became a mode (`whole` / `line` / `none`), which is
+what makes "loop this line while I rewrite it" possible.
+
+The timeline lives in `src/timeline.ts` rather than the renderer: it is pure arithmetic, it
+is the one piece that silently attributes movement to the wrong line if it is wrong, and
+keeping it free of three.js means it can be tested.
+
+**Nothing blends the seams.** There is still no pose interpolation anywhere, deliberately. A
+draft's joins are meant to be visible — smoothing them would disguise the exact thing the
+draft/bake distinction exists to show.
+
+**Honesty, as built.** A banner appears whenever what is playing is not the baked poem, in
+two flavours: lines drafted separately, or a bake the poem has since moved past. The
+telemetry says `baked · continuous` or `drafted · lines generated apart` on the stage itself.
+A draft is never handed a `segments` array — that field means continuous, and only a bake
+earns it. Line state is a dot: hollow, faint amber, solid amber, dashed red.
+
+**Testing needed no new dependencies.** Node 24 runs TypeScript directly, so
+`src/poem.test.ts` uses the built-in `node:test` and `npm test` runs it. Test files are
+excluded from `tsc` because `@types/node` cannot currently be installed — the dependency tree
+has a **pre-existing** `typedoc-plugin-markdown` / `typedoc` / rollup peer conflict, unrelated
+to this work, and the app build should not wait on resolving it.
+
 ### Still to come
 
-- **Stage B** — the editor, per-line duration and history, the renderer timeline with real
-  loop modes, and the honesty requirements around drafts.
 - **Stage C** — the notation registers, which currently subdivide the whole clip by fixed
   counts (16 buckets, 7 poses, 6 beats) and normalise per clip. A five-line poem would get
   roughly 1.4 chronophotograph poses per line, and the loudest line would set the scale for
