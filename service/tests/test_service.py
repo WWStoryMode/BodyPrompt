@@ -114,3 +114,86 @@ def test_health_describes_model_sources():
     assert {item["model"] for item in capabilities} == {
         "kimodo", "snapmogen", "language-of-motion"
     }
+
+
+def test_stub_poem_tiles_its_frames_and_admits_no_model_stitched_it():
+    lines = [
+        {"prompt": "a body remembers", "duration_seconds": 3.0},
+        {"prompt": "a place it cannot return to", "duration_seconds": 5.0},
+    ]
+    motion = StubGenerator().generate("kimodo", None, lines=lines)
+
+    assert validate_motion(motion) is motion
+    assert len(motion["frames"]) == round(8.0 * motion["fps"])
+    assert [s["prompt"] for s in motion["segments"]] == [line["prompt"] for line in lines]
+    assert motion["segments"][0]["end_frame"] == motion["segments"][1]["start_frame"]
+    assert motion["segments"][-1]["transition_frames"] == 0  # nothing follows the last line
+    assert motion["stub"] is True
+    # `segments` says this is a poem; provenance must still say nothing generated it, or a
+    # fixture could pass for a real continuous reading.
+    assert motion["provenance"]["multi_prompt"] is None
+    assert "variants" not in motion  # the ghost-cloud is a per-line instrument
+
+
+def test_segments_that_do_not_cover_the_motion_are_rejected():
+    motion = StubGenerator().generate("kimodo", "move")
+    motion["segments"] = [
+        {"index": 0, "prompt": "a", "start_frame": 0, "end_frame": 5,
+         "transition_frames": 0, "duration_seconds": 1.0},
+    ]
+
+    with pytest.raises(RuntimeError, match="segments cover 5 frames"):
+        validate_motion(motion)
+
+
+def test_a_gap_between_segments_is_rejected():
+    motion = StubGenerator().generate("kimodo", "move")
+    total = len(motion["frames"])
+    motion["segments"] = [
+        {"index": 0, "prompt": "a", "start_frame": 0, "end_frame": 5,
+         "transition_frames": 0, "duration_seconds": 1.0},
+        {"index": 1, "prompt": "b", "start_frame": 9, "end_frame": total,
+         "transition_frames": 0, "duration_seconds": 1.0},
+    ]
+
+    with pytest.raises(RuntimeError, match="expected 5"):
+        validate_motion(motion)
+
+
+def test_poem_request_reaches_the_worker_as_lines_not_a_prompt():
+    from app.generators import KimodoGenerator
+
+    generator = KimodoGenerator()
+    sent = {}
+
+    def capture(path, payload=None):
+        sent.update(payload or {})
+        return StubGenerator().generate("kimodo", "move")
+
+    generator._json = capture
+    lines = [{"prompt": "first", "duration_seconds": 2.0},
+             {"prompt": "second", "duration_seconds": 2.0}]
+    motion = generator.generate("kimodo", None, lines=lines, transition_frames=7)
+
+    assert sent["lines"] == lines
+    assert sent["transition_frames"] == 7
+    assert "prompt" not in sent  # the worker rejects a request carrying both
+    assert motion["prompt"] == "first\nsecond"
+
+
+def test_provenance_says_whether_the_model_really_stitched_the_poem():
+    from app.generators import KimodoGenerator
+
+    generator = KimodoGenerator()
+    worker_motion = StubGenerator().generate("kimodo", "move")
+    worker_motion["multi_prompt"] = True
+    worker_motion["transition_frames"] = 5
+
+    generator._json = lambda path, payload=None: worker_motion
+    motion = generator.generate(
+        "kimodo", None, lines=[{"prompt": "x", "duration_seconds": 2.0}]
+    )
+
+    assert motion["provenance"]["multi_prompt"] is True
+    assert motion["provenance"]["transition_frames"] == 5
+    assert "multi_prompt" not in motion  # provenance, not loose beside the motion
