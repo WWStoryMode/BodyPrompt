@@ -175,6 +175,20 @@ The bridge from v0 to v1 is deliberately split: **v0.5 makes the pipeline real w
 ML** (prompt → service → canonical motion → animated stick figure), so v1 only has to swap
 the stub for a model.
 
+### Parked, deliberately
+
+Real generation raised questions the stub could not. They belong to the versions that own
+those instruments rather than to v1, and are held until those versions are reopened:
+
+- **v2.5 — displacement in the ghost-cloud.** Kimodo's siblings travel different distances
+  for one prompt (2.31, 3.12, 3.64, 4.77 m), and roughly 75% of the visible spread between
+  them is root travel rather than limb difference. **Displacement is real variance and stays
+  in the performance view** — how far a body goes is part of how the model read the prompt,
+  not an artefact to be normalised away. What remains open is offering *pelvis-aligned* as an
+  optional view, so the ~0.15 m of genuine articulation difference can be examined on its own
+  when that is the question being asked. An option, never the default.
+- **v2 — further lineage features**, scope still to be decided.
+
 ---
 
 ## The architecture that supports the research
