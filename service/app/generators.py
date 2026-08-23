@@ -118,6 +118,8 @@ class Generator:
         seed: int | None = None,
         post_processing: bool = True,
         denoising_steps: int | None = None,
+        lines: list[dict] | None = None,
+        transition_frames: int = 5,
     ) -> dict:
         """
         Return a canonical motion. When `variants` > 1, the motion also carries a
@@ -126,6 +128,11 @@ class Generator:
         `post_processing` and `denoising_steps` only mean anything to a backend that runs a
         model; a fixture has nothing to clean up and no schedule to walk, and records
         `None` for both.
+
+        `lines` asks for a **poem**: the sentences become one continuous motion, each
+        carrying on from where the last left the body, and the result carries a `segments`
+        array saying where each line lives in it. `prompt` and `lines` are mutually
+        exclusive; the caller has already enforced that.
         """
         raise NotImplementedError
 
@@ -164,6 +171,71 @@ class StubGenerator(Generator):
     def count(self) -> int:
         return len(self._fixtures)
 
+    def _pick(self, model: str, prompt: str) -> dict:
+        """The fixture a given (model, prompt) always resolves to."""
+        key = f"{model}:{prompt}"
+        return self._fixtures[(sum(ord(c) for c in key) if key else 0) % len(self._fixtures)]
+
+    def _poem(self, model: str, lines: list[dict], transition_frames: int) -> dict:
+        """A stand-in poem: one fixture per line, laid end to end.
+
+        HONESTY: a real poem is stitched by the model, which conditions each line on the
+        decoded tail of the line before it — the body genuinely carries through. This
+        cannot do that. It picks a fixture per line, loops it to the requested length, and
+        slides each line so its pelvis starts where the previous line's ended. The joins
+        are a translation, not a transition: limbs will jump even though the root does not.
+        It exists so the whole poem path — segments, playback, notation — can be exercised
+        with no GPU, and every motion it returns says `stub: true`.
+        """
+        frames: list[dict] = []
+        segments: list[dict] = []
+        base = self._pick(model, lines[0]["prompt"])
+        fps = int(base["fps"])
+        carry = [0.0, 0.0]  # where the previous line left the pelvis, in X/Z
+
+        for index, line in enumerate(lines):
+            source = self._pick(model, line["prompt"])["frames"]
+            wanted = round(float(line["duration_seconds"]) * fps)
+            start = len(frames)
+            first = source[0]["positions"][0]
+            for step in range(wanted):
+                frame = source[step % len(source)]  # loop the fixture to fill the line
+                positions = [
+                    [p[0] - first[0] + carry[0], p[1], p[2] - first[2] + carry[1]]
+                    for p in frame["positions"]
+                ]
+                frames.append({"positions": positions, "rotations": frame["rotations"]})
+            carry = [frames[-1]["positions"][0][0], frames[-1]["positions"][0][2]]
+            segments.append({
+                "index": index,
+                "prompt": line["prompt"],
+                "start_frame": start,
+                "end_frame": len(frames),
+                "transition_frames": transition_frames if index < len(lines) - 1 else 0,
+                "duration_seconds": float(line["duration_seconds"]),
+            })
+
+        motion = dict(base)
+        motion["frames"] = frames
+        motion["segments"] = segments
+        motion["prompt"] = "\n".join(line["prompt"] for line in lines)
+        motion["model"] = model or base.get("model", "")
+        motion["stub"] = True
+        motion.pop("variants", None)  # a poem carries no ghost-cloud; the cloud is per line
+        motion["provenance"] = {
+            "source": "fixture",
+            "backend": self.name,
+            "model_version": "bodyprompt-fixtures/v0",
+            "inference_ms": 0,
+            "post_processing": None,
+            "denoising_steps": None,
+            # No model stitched this. `segments` says it is a poem; this says nothing
+            # generated it, so it can never be mistaken for a real continuous reading.
+            "multi_prompt": None,
+            "transition_frames": None,
+        }
+        return motion
+
     def generate(
         self,
         model: str,
@@ -173,9 +245,14 @@ class StubGenerator(Generator):
         seed: int | None = None,
         post_processing: bool = True,
         denoising_steps: int | None = None,
+        lines: list[dict] | None = None,
+        transition_frames: int = 5,
     ) -> dict:
         if not self._fixtures:
             raise RuntimeError("no fixtures found; run `python3 fixtures/_generate.py`")
+
+        if lines is not None:
+            return self._poem(model, lines, transition_frames)
 
         # Deterministic pick, keyed on BOTH prompt and model: same (prompt, model) always
         # gives the same motion, and the three models give three different ones.
@@ -184,9 +261,7 @@ class StubGenerator(Generator):
         # are an ARBITRARY ARTEFACT OF HASHING — they are not three models interpreting a
         # theme differently. Nothing here can be read as a finding about model behaviour.
         # When a real model lands, these differences become real and this comment goes.
-        key = f"{model}:{prompt}"
-        idx = (sum(ord(c) for c in key) if key else 0) % len(self._fixtures)
-        base = self._fixtures[idx]
+        base = self._pick(model, prompt)
 
         # There are only a handful of fixtures, so two models can hash to the same one and
         # would then render identically — a triptych of twins. Give each model a stable
@@ -277,27 +352,36 @@ class KimodoGenerator(Generator):
         seed: int | None = None,
         post_processing: bool = True,
         denoising_steps: int | None = None,
+        lines: list[dict] | None = None,
+        transition_frames: int = 5,
     ) -> dict:
         if model != "kimodo":
             return self._stub.generate(
                 model, prompt, variants, duration_seconds, seed, post_processing,
-                denoising_steps,
+                denoising_steps, lines, transition_frames,
             )
 
         chosen_seed = seed if seed is not None else secrets.randbelow(2**31)
         started = time.perf_counter()
-        motion = self._json(
-            "/generate",
-            {
-                "prompt": prompt,
-                "duration_seconds": duration_seconds,
-                "variants": variants,
-                "seed": chosen_seed,
-                "post_processing": post_processing,
-                "denoising_steps": denoising_steps,
-            },
+        payload: dict = {
+            "variants": variants,
+            "seed": chosen_seed,
+            "post_processing": post_processing,
+            "denoising_steps": denoising_steps,
+            "transition_frames": transition_frames,
+        }
+        # One shape or the other: the worker rejects a request carrying both.
+        if lines is not None:
+            payload["lines"] = lines
+        else:
+            payload["prompt"] = prompt
+            payload["duration_seconds"] = duration_seconds
+        motion = self._json("/generate", payload)
+        # The worker may never rewrite the researcher's phrasing. For a poem the phrase is
+        # the whole poem, and the per-line prompts stay in `segments` where they belong.
+        motion["prompt"] = (
+            "\n".join(line["prompt"] for line in lines) if lines is not None else prompt
         )
-        motion["prompt"] = prompt  # the worker may never rewrite the researcher's phrase
         motion["model"] = "kimodo"
         motion["stub"] = False
         motion["provenance"] = {
@@ -310,6 +394,11 @@ class KimodoGenerator(Generator):
             # The count the worker actually used — a request of None resolves to its
             # configured default, and the motion must be able to say which.
             "denoising_steps": motion.pop("denoising_steps", None),
+            # Whether the model really stitched this as one continuous motion, rather than
+            # whether we asked it to. `segments` alone would not distinguish a stitched
+            # poem from lines merely laid end to end.
+            "multi_prompt": motion.pop("multi_prompt", None),
+            "transition_frames": motion.pop("transition_frames", None),
         }
         return motion
 

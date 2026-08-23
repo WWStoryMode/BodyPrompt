@@ -17,6 +17,38 @@ EDGES = [
 ]
 
 
+def _validate_segments(segments, total_frames: int) -> None:
+    """A poem's segments must tile its frames exactly, or a line maps to the wrong body.
+
+    The segment table is what lets the instrument say "this movement is that sentence".
+    A gap, an overlap or a short count would silently attribute movement to the wrong
+    line, which is worse than having no table at all.
+    """
+    if segments is None:
+        return
+    if not segments:
+        raise ValueError("segments present but empty")
+    expected_start = 0
+    for index, segment in enumerate(segments):
+        if segment["index"] != index:
+            raise ValueError(f"segment {index} is out of order")
+        if segment["start_frame"] != expected_start:
+            raise ValueError(
+                f"segment {index} starts at {segment['start_frame']}, expected {expected_start}"
+            )
+        if segment["end_frame"] <= segment["start_frame"]:
+            raise ValueError(f"segment {index} ends before it starts")
+        if not str(segment["prompt"]).strip():
+            raise ValueError(f"segment {index} has no prompt")
+        if segment["transition_frames"] < 0:
+            raise ValueError(f"segment {index} has negative transition frames")
+        expected_start = segment["end_frame"]
+    if expected_start != total_frames:
+        raise ValueError(
+            f"segments cover {expected_start} frames but the motion has {total_frames}"
+        )
+
+
 def validate_motion(motion: dict, *, allow_variants: bool = True) -> dict:
     """Return the motion unchanged, or raise a user-safe RuntimeError."""
     try:
@@ -46,6 +78,7 @@ def validate_motion(motion: dict, *, allow_variants: bool = True) -> dict:
                 for value in frame["rotations"]
             ):
                 raise ValueError("frame contains malformed or non-finite rotations")
+        _validate_segments(motion.get("segments"), len(frames))
         variants = motion.get("variants", [])
         if variants and not allow_variants:
             raise ValueError("a variant may not contain nested variants")

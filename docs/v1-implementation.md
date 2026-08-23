@@ -263,12 +263,23 @@ four ways. That is a question about the instrument, not a bug: the displacement 
 variance and stays in the performance view. An optional pelvis-aligned view is parked
 against v2.5 — see the roadmap in README.md.
 
-### Still requiring work
+### Left to the research, not the implementation
 
-- Judge notation readability against real motion, now that the floor path must fit several
-  metres of travel and the Laban support column has genuine foot-contact data.
+Nothing here blocks v1. Both are judgements to be made *with* the instrument once the
+system is fully built, not code still owed:
 
-**v1 has generated real movement, and the canonical motion is anatomically sound.** What
-remains is calibration and instrument design, not whether the boundary works. Only output
-whose provenance says `source: kimodo` is a model generation; SnapMoGen and Language of
-Motion are still fixtures, and the triptych is still not cross-model evidence.
+- **Whether 75-step motion reads as well as 100-step**, and so whether the default should
+  move. The measurements above bound the question — 75 diverges from 100 by 7% of what a
+  seed change does — but reading quality is a studio judgement. Until it is made, the
+  default stays at Kimodo's own 100 and `denoising_steps` is there for anyone testing it.
+- **Whether the four notation registers stay legible against real motion**, now that the
+  floor path must fit several metres of travel and the Laban support column has genuine
+  foot-contact data rather than fixture approximations. The registers were designed against
+  stub motion, and stub motion turned out to mis-model leg variance by eleven to twenty
+  times, so this is worth looking at properly rather than assuming.
+
+**v1 is complete as an implementation.** It generates real movement, the canonical motion
+is anatomically sound, the latency is measured and inside budget at 75 steps, and every
+motion records what produced it. Only output whose provenance says `source: kimodo` is a
+model generation; SnapMoGen and Language of Motion are still fixtures, and the triptych is
+still not cross-model evidence.
