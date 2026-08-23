@@ -49,6 +49,7 @@ One motion is one JSON object:
 | `seed` | Generation seed — part of making variation reproducible. |
 | `variants` | *Optional.* The **ghost-cloud**: sibling motions from the same prompt with different seeds (see below). |
 | `provenance` | *Optional, v1.* Honest source metadata: `source`, `backend`, `model_version`, and measured `inference_ms`. |
+| `segments` | *Optional, v2.* Present only on a **poem**: where each line's movement sits in `frames` (see below). |
 
 ## The ghost-cloud (`variants`)
 
@@ -69,6 +70,39 @@ as translucent figures around the selected one, making the **variability of the 
 > barely move, the wrists and head move most — so a cloud reads as *the same intention,
 > differently expressed*. When a real model lands, it replaces this with genuine multi-seed
 > sampling and nothing else has to change.
+
+## The poem (`segments`)
+
+Ask `POST /generate` for `{"lines": [{"prompt": …, "duration_seconds": …}, …]}` and the
+motion comes back with a `segments` array — one entry per line, saying where that line's
+movement lives:
+
+```json
+{ "index": 0, "prompt": "a body remembers",
+  "start_frame": 0, "end_frame": 150,
+  "transition_frames": 5, "duration_seconds": 5.0 }
+```
+
+- **Additive and optional.** A single-prompt request returns exactly what it always did.
+- **Segments tile the motion exactly**: segment 0 starts at frame 0, each begins where the
+  last ended, and the final `end_frame` equals `frames.length`. The service rejects any
+  motion where that is not true — a gap or an overlap would attribute movement to the wrong
+  sentence, which is worse than having no table at all.
+- `transition_frames` are the trailing frames a segment shares with the next one. They
+  belong to **both lines and to neither**: with post-processing on, Kimodo generates them
+  under the *following* line's prompt. Zero on the last segment.
+- `prompt` at the top level is the whole poem, lines joined by newlines. The per-line
+  phrasing lives in the segments.
+- A poem carries **no `variants`**. The ghost-cloud is a per-line instrument: four readings
+  of a five-line poem would cost minutes, and the model cannot re-roll one line alone.
+
+> **Honesty note.** `segments` says *where the lines are*, not that they flow into one
+> another. Only `provenance.multi_prompt: true` means the model actually stitched them,
+> conditioning each line on the body left by the one before. Lines generated separately and
+> laid end to end carry segments too, and the body visibly jumps between them. The fixture
+> backend's poem is exactly that: it loops a fixture per line and slides each so the pelvis
+> continues, which moves the root but not the limbs. It records
+> `provenance.multi_prompt: null` — no model stitched it — and `stub: true`.
 
 ## Skeleton `smpl-22`
 
