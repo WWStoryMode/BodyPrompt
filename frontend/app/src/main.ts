@@ -27,6 +27,23 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const promptEl = $<HTMLInputElement>("prompt");
 const modelEl = $<HTMLSelectElement>("model");
 const durationEl = $<HTMLSelectElement>("duration");
+const stepsEl = $<HTMLInputElement>("steps");
+// Denoising steps: empty leaves the choice to the worker's configured default, so the UI
+// never silently pins a value the backend did not choose. A number box accepts anything
+// typed past its min/max, and the service rejects out-of-range values with a 422 — so
+// clamp here rather than let a typo read as a failed generation.
+const chosenSteps = (): number | null => {
+  const raw = stepsEl.value.trim();
+  if (!raw) return null;
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return null;
+  return Math.min(100, Math.max(1, n));
+};
+// Show back what will actually be sent, so the box never disagrees with the provenance.
+stepsEl.addEventListener("blur", () => {
+  const n = chosenSteps();
+  stepsEl.value = n === null ? "" : String(n);
+});
 const generateEl = $<HTMLButtonElement>("generate");
 const generationStatusEl = $<HTMLSpanElement>("generation-status");
 const stageEl = $<HTMLDivElement>("stage");
@@ -122,6 +139,7 @@ async function generateTriptych(): Promise<void> {
             prompt,
             variants: 1,
             duration_seconds: Number(durationEl.value),
+            denoising_steps: chosenSteps(),
           }),
         });
         if (!res.ok) throw new Error(await responseError(res));
@@ -256,7 +274,11 @@ function showMotion(motion: CanonicalMotion): void {
     (provenance
       ? `<span class="k">source</span> ${safe(provenance.source)} · ` +
         `${safe(provenance.model_version)}<br>` +
-        `<span class="k">generated</span> ${(provenance.inference_ms / 1000).toFixed(1)} s<br>`
+        `<span class="k">generated</span> ${(provenance.inference_ms / 1000).toFixed(1)} s` +
+        (provenance.denoising_steps
+          ? ` · ${provenance.denoising_steps} steps`
+          : "") +
+        `<br>`
       : "") +
     (ghostCount
       ? `<span class="k">cloud</span> ${ghostCount} other seeds<br>`
@@ -304,6 +326,7 @@ async function generate(): Promise<void> {
         prompt: promptEl.value,
         variants: VARIANTS, // ask for the ghost-cloud alongside the primary
         duration_seconds: Number(durationEl.value),
+        denoising_steps: chosenSteps(),
       }),
     });
     if (!res.ok) throw new Error(await responseError(res));

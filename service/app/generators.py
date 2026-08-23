@@ -117,13 +117,15 @@ class Generator:
         duration_seconds: float = 5.0,
         seed: int | None = None,
         post_processing: bool = True,
+        denoising_steps: int | None = None,
     ) -> dict:
         """
         Return a canonical motion. When `variants` > 1, the motion also carries a
         `variants` list of siblings (same prompt, different seeds) for the ghost-cloud.
 
-        `post_processing` only means anything to a backend that runs a model; a fixture
-        has nothing to clean up and records `None` for it.
+        `post_processing` and `denoising_steps` only mean anything to a backend that runs a
+        model; a fixture has nothing to clean up and no schedule to walk, and records
+        `None` for both.
         """
         raise NotImplementedError
 
@@ -170,6 +172,7 @@ class StubGenerator(Generator):
         duration_seconds: float = 5.0,
         seed: int | None = None,
         post_processing: bool = True,
+        denoising_steps: int | None = None,
     ) -> dict:
         if not self._fixtures:
             raise RuntimeError("no fixtures found; run `python3 fixtures/_generate.py`")
@@ -202,6 +205,7 @@ class StubGenerator(Generator):
             "model_version": "bodyprompt-fixtures/v0",
             "inference_ms": 0,
             "post_processing": None,  # nothing ran, so there was nothing to clean up
+            "denoising_steps": None,  # a fixture has no noise schedule to walk
         }
 
         # The ghost-cloud: siblings of this motion, one per extra seed. Seeds are derived
@@ -272,10 +276,12 @@ class KimodoGenerator(Generator):
         duration_seconds: float = 5.0,
         seed: int | None = None,
         post_processing: bool = True,
+        denoising_steps: int | None = None,
     ) -> dict:
         if model != "kimodo":
             return self._stub.generate(
-                model, prompt, variants, duration_seconds, seed, post_processing
+                model, prompt, variants, duration_seconds, seed, post_processing,
+                denoising_steps,
             )
 
         chosen_seed = seed if seed is not None else secrets.randbelow(2**31)
@@ -288,6 +294,7 @@ class KimodoGenerator(Generator):
                 "variants": variants,
                 "seed": chosen_seed,
                 "post_processing": post_processing,
+                "denoising_steps": denoising_steps,
             },
         )
         motion["prompt"] = prompt  # the worker may never rewrite the researcher's phrase
@@ -300,6 +307,9 @@ class KimodoGenerator(Generator):
             "inference_ms": round((time.perf_counter() - started) * 1000),
             # What the worker reports it actually did, not what we asked for.
             "post_processing": motion.pop("post_processing", None),
+            # The count the worker actually used — a request of None resolves to its
+            # configured default, and the motion must be able to say which.
+            "denoising_steps": motion.pop("denoising_steps", None),
         }
         return motion
 

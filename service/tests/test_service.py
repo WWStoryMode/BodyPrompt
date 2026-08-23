@@ -39,6 +39,40 @@ def test_fixture_provenance_says_post_processing_never_applied():
     motion = StubGenerator().generate("snapmogen", "move", post_processing=True)
 
     assert motion["provenance"]["post_processing"] is None
+    assert motion["provenance"]["denoising_steps"] is None
+
+
+def test_provenance_records_the_steps_the_worker_used_not_the_request():
+    """A request of None resolves to the worker's configured default. Step count shifts
+    the motion by a real fraction of sibling variance, so the record must name the number
+    that produced this motion, never the absence of a request."""
+    from app.generators import KimodoGenerator
+
+    generator = KimodoGenerator()
+    worker_motion = StubGenerator().generate("kimodo", "move")
+    worker_motion["denoising_steps"] = 75  # what the worker resolved it to
+
+    generator._json = lambda path, payload=None: worker_motion
+    motion = generator.generate("kimodo", "move", denoising_steps=None)
+
+    assert motion["provenance"]["denoising_steps"] == 75
+    assert "denoising_steps" not in motion  # provenance, not loose beside the motion
+
+
+def test_requested_steps_reach_the_worker():
+    from app.generators import KimodoGenerator
+
+    generator = KimodoGenerator()
+    sent = {}
+
+    def capture(path, payload=None):
+        sent.update(payload or {})
+        return StubGenerator().generate("kimodo", "move")
+
+    generator._json = capture
+    generator.generate("kimodo", "move", denoising_steps=25)
+
+    assert sent["denoising_steps"] == 25
 
 
 @pytest.fixture

@@ -51,6 +51,11 @@ class GenerateRequest(BaseModel):
     # Kimodo's foot-skate and constraint cleanup; ignored by fixture backends. Which one
     # produced a given motion is recorded in its provenance.
     post_processing: bool = True
+    # Kimodo's DDIM sampling steps — an absolute count, not a fraction. Fewer steps is
+    # faster and shifts the motion; 75 was calibrated as the highest setting inside the
+    # latency budget. None uses the worker's configured default. Meaningless to fixture
+    # backends, and recorded in provenance either way.
+    denoising_steps: int | None = Field(default=None, ge=1, le=500)
 
 
 @app.get("/health")
@@ -76,6 +81,7 @@ def generate(req: GenerateRequest) -> dict:
                 duration_seconds=req.duration_seconds,
                 seed=req.seed,
                 post_processing=req.post_processing,
+                denoising_steps=req.denoising_steps,
             )
         )
     except RuntimeError as err:
