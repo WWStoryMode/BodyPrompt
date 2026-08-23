@@ -24,8 +24,13 @@ services:
       TEXT_ENCODER_MODE: ${TEXT_ENCODER_MODE:-local}
       TEXT_ENCODER_URL: ${TEXT_ENCODER_URL:-}
       BODYPROMPT_DIFFUSION_STEPS: ${BODYPROMPT_DIFFUSION_STEPS:-100}
+      # Where Kimodo's text-embedding cache lives. Spelled exactly as its code reads it —
+      # the lowercase prefix is Kimodo's, not a typo. Given a volume below so a re-run of a
+      # phrase skips the CPU encode even after a restart.
+      kimodo_EMBED_CACHE_DIR: /root/.cache/kimodo/embeddings
     volumes:
       - huggingface-cache:/root/.cache/huggingface
+      - embedding-cache:/root/.cache/kimodo/embeddings
     deploy:
       resources:
         reservations:
@@ -36,3 +41,4 @@ services:
 
 volumes:
   huggingface-cache:
+  embedding-cache:
