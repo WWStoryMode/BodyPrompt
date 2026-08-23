@@ -163,7 +163,7 @@ in front of an audience:
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
-| **v1** | Single-model prompting — Kimodo behind the service | ◐ generating; calibration open |
+| **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
 | **v5** | Open research platform — others can search too | |
 
@@ -188,6 +188,20 @@ those instruments rather than to v1, and are held until those versions are reope
   optional view, so the ~0.15 m of genuine articulation difference can be examined on its own
   when that is the question being asked. An option, never the default.
 - **v2 — further lineage features**, scope still to be decided.
+
+### Questions for the research, not the build
+
+Two things are deliberately *not* on this roadmap, because they are findings to be made
+with the instrument rather than code still owed. Both wait until the system is fully built:
+
+- **Whether fewer denoising steps read as well.** 75 steps meets the latency budget and
+  diverges from 100 by 7% of what a seed change does; whether that costs anything a dancer
+  would notice is a studio judgement. The default stays at Kimodo's own 100 until it is
+  made, and the step count is a control in the prompt bar for anyone testing it.
+- **Whether the four notation registers stay legible against real motion.** They were
+  designed against stub data — which turned out to mis-model leg variance by eleven to
+  twenty times — and now have several metres of travel and genuine foot-contact data to
+  carry.
 
 ---
 
@@ -293,10 +307,12 @@ A usable health response has `"backend":"kimodo"`, `"ml":true` and `"ready":true
 output labelled with runtime provenance `source: kimodo` is real model output; SnapMoGen and
 Language of Motion remain fixtures.
 
-This path has been validated on an RTX 5080: the motion is real and the skeleton is
-anatomically sound. It is still not a production-supported route — one prompt plus a
-ghost-cloud takes about 25 seconds rather than the intended 15, and it wants a GPU, a
-gated Hugging Face repository and roughly 18 GB of downloads. The open items are listed in
+This path has been validated on an RTX 5080: the motion is real, the skeleton is
+anatomically sound, and the latency is measured. One prompt plus a ghost-cloud takes about
+19 seconds at the default 100 denoising steps, or under 15 at 75 — the step count is a
+control in the prompt bar, and every motion records which was used. It is still not a
+production-supported route: it wants a GPU, a gated Hugging Face repository and roughly
+18 GB of downloads. What is left is written up in
 [`docs/v1-implementation.md`](docs/v1-implementation.md). See
 [the full usage guide](docs/usage.md#running-the-v1-kimodo-backend-experimental)
 for setup, verification and troubleshooting.
@@ -346,9 +362,9 @@ The original static mockups need no build — just `open frontend/mockups/index.
 
 ## Status
 
-**The research instrument runs in fixture mode by default. The v1 Kimodo path now generates
-real movement on its target GPU; what remains is calibration and instrument design, not
-whether the boundary works.**
+**The research instrument runs in fixture mode by default. The v1 Kimodo path generates
+real movement on its target GPU, calibrated and inside its latency budget. What remains
+are questions for the research to answer with the instrument, not code still owed.**
 
 Working today: type a phrase → a 3D stick figure moves; every prompt branches into a
 **lineage tree** (nothing is overwritten); one prompt shows **many seeds** as a variance

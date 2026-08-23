@@ -281,6 +281,13 @@ HF_TOKEN=hf_replace_with_a_fine_grained_read_token
 BODYPROMPT_DIFFUSION_STEPS=100
 ```
 
+`BODYPROMPT_DIFFUSION_STEPS` is the fallback when a request does not name one — the prompt
+bar has a `steps` box, and `POST /generate` takes `denoising_steps`. It is an absolute
+count of DDIM sampling steps, not a fraction: 100 is Kimodo's own default, not a ceiling.
+Four variants take ~19 s at 100 and ~15 s at 75; below 75 the step count starts shifting
+the motion by a sizeable fraction of what changing the seed does, so it stops being a free
+speed dial. Whichever number produced a motion is recorded in its provenance.
+
 Keep the token in `.env`, which is ignored by Git. Do not put it directly in a shell command
 where it may be retained in shell history. Then build and start the service and GPU worker:
 
