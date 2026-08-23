@@ -26,8 +26,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends python3.10-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Pinned, not tracking main. Kimodo has changed its SOMA output skeleton once already, and
+# its published API differs from its source in four places the worker had to be corrected
+# for; a silent bone rename would not crash the adapter, it would return a plausible-looking
+# body with false anatomy. This is the commit the bone-rigidity check passed against.
+# Moving it is a deliberate edit: bump the hash, re-run the check, record it in
+# docs/v1-implementation.md.
 RUN python3.10 -m pip install --no-cache-dir \
-      "git+https://github.com/nv-tlabs/kimodo.git"
+      "git+https://github.com/nv-tlabs/kimodo.git@1aece8c124d73d255ceff5086d983b844c9f4e94"
 
 COPY pyproject.toml .
 COPY app app
