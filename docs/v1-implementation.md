@@ -20,8 +20,10 @@ Target: Linux, an NVIDIA GPU with 8–16 GB VRAM, and the text encoder on CPU. T
 budget for one primary plus three variants is under 15 seconds. Denoising is calibrated in
 the order 100 → 75 → 50 → 25 steps; the highest setting inside the budget wins.
 
-That budget is **not currently met** — 24.7 seconds measured on 2026-08-22, for a reason
-the step count cannot fix. See the development log below before treating it as achieved.
+That budget was missed on 2026-08-22 (24.7 s) and is **met at 75 steps as of 2026-08-23**:
+14.77 s warm for four variants, against 19.37 s at 100. Two changes got there — caching the
+text embedding, and the step calibration itself. The default remains 100 until the studio
+judges 75-step motion by eye; `denoising_steps` is selectable per request.
 
 ## Shape of the implementation
 
@@ -63,7 +65,8 @@ anything to the model.
 {
   "duration_seconds": 5.0,
   "seed": 4021,
-  "post_processing": true
+  "post_processing": true,
+  "denoising_steps": 75
 }
 ```
 
@@ -75,16 +78,25 @@ anything to the model.
   Kimodo's own CLI, because unplanted feet corrupt two of the four notation registers —
   the floor path and the Laban support column read the feet directly. Ask for `false` to
   see the denoiser's raw output. Fixture backends ignore it.
+- Denoising steps is optional, 1–500, and defaults to the worker's configured value. It is
+  an absolute count of DDIM sampling steps, not a fraction — 100 is Kimodo's own CLI
+  default, not a ceiling. Fewer steps takes a coarser path to a fully denoised motion, so
+  it changes *which* motion arrives rather than degrading it. Fixture backends ignore it.
 - Errors now use non-2xx responses with a `detail` message.
 
 Canonical motions gain an additive `provenance` object: `source`, `backend`,
-`model_version`, `inference_ms`, and `post_processing`. The old `stub` boolean remains for
+`model_version`, `inference_ms`, `post_processing`, and `denoising_steps`. The old `stub`
+boolean remains for
 compatibility. The UI reads `/health` before labeling a model real, fixture, or
 unavailable.
 
 `provenance.post_processing` records what the worker reports it actually did, not what was
-requested, so the two cannot diverge silently. Fixtures record `null`: no model ran, so
-there was nothing to clean up, and no fixture can pass as raw model output.
+requested, so the two cannot diverge silently. `provenance.denoising_steps` does the same
+for the step count, resolving a request of `null` to the number actually used — a motion
+that cannot name its step count is a motion whose ghost-cloud cannot be read, because the
+setting displaces the body by a real fraction of what a seed change does. Fixtures record
+`null` for both: no model ran, so there was nothing to clean up and no schedule to walk,
+and no fixture can pass as raw model output.
 
 ## Development log
 
@@ -105,7 +117,8 @@ there was nothing to clean up, and no fixture can pass as raw model output.
 ### 2026-08-22 — first real generation
 
 Ran on the target machine: an RTX 5080 Laptop (16 GB VRAM, Blackwell `sm_120`) under WSL2,
-with Kimodo `main` at `1aece8c`.
+with Kimodo `main` at `1aece8c` — since pinned in the worker Dockerfile, so this remains
+the Kimodo every measurement below describes.
 
 **Four assumptions in the 07-28 slice did not survive contact with the release.** Each was
 written against the documentation rather than the installed package:
@@ -141,9 +154,85 @@ along +Z confirm metres, Y-up and Kimodo's default heading, as the adapter assum
 **Latency at 100 denoising steps**, one 5-second motion: 6.8 s cold, 5.8 s warm — but
 **24.7 s for one primary plus three variants, against a 15-second budget**. The cause is
 structural, not the step count: `_one()` calls the model once per variant, so the CPU text
-encode is paid four times over. Stepping denoising down would help less than encoding once
-and sampling four times, but that would replace the consecutive-seed sibling contract with
-batch sampling. Unresolved; the step-count calibration is deferred until it is decided.
+encode is paid four times over.
+
+**Resolved on 2026-08-23 by caching the embedding, not by batching.** The obvious fix —
+one `model(..., num_samples=4)` call — encodes once but draws all four samples from a single
+seeded stream, so a sibling stops being reproducible on its own. Three things already depend
+on it not doing that: `docs/motion-schema.md` promises each sibling "its own `seed`",
+`lineage.ts` stores that seed per node, and the UI prints it on screen. Trading a true seed
+for four seconds would have put a number on the screen that could not reproduce the motion
+beside it.
+
+Kimodo ships the alternative. `CachedTextEncoder` (in its `demo` package) wraps the encoder
+with an in-memory LRU over a disk cache, and the model calls its encoder at exactly one
+place, so it drops in. An embedding is a pure function of its text: reusing it changes
+nothing about what is generated. Variants 2–4 skip the CPU encode, and so does any re-run of
+a phrase, across restarts — the cache has its own volume. Every seed stays real.
+
+Two details worth keeping: the class lives under `kimodo.demo`, whose `__init__` imports the
+viser demo UI that this worker does not install, so it is loaded by file path rather than by
+name — safe only because the Kimodo commit is now pinned. And it is a speed-up, so it fails
+soft: a worker that cannot cache still generates, and `/health` reports
+`text_embedding_cache` beside `text_encoder_device` so a silent fallback cannot pass for a
+slow GPU.
+
+**Measured 2026-08-23, and it corrected the diagnosis.** Caching removed ~3 s of a
+four-variant run on a new phrase (24.7 s → 20.7 s) and ~6 s on a repeat (18.8 s). Useful,
+but not the fix — because the encode was never the dominant cost.
+
+Per-stage, measured by differencing cold/warm and post-on/post-off single runs:
+
+| stage | model | cost | paid |
+|---|---|---|---|
+| text encode | Llama-3-8B (LLM2Vec, CPU) | ~0.8 s | once per unique phrase, then never |
+| denoising, 100 steps | Kimodo (GPU) | ~4.6 s | **every variant** |
+| post-processing | Kimodo (MotionCorrection) | ~0.17 s | every variant |
+
+**Kimodo's denoiser is 89% of a four-variant generation; the 8-billion-parameter language
+model is 4%.** Per-variant cost is perfectly linear (4.72 / 9.45 / 18.75 s for 1 / 2 / 4),
+so nothing but the embedding is shared between siblings.
+
+### Step-count calibration — 2026-08-23
+
+Same prompt, same seed 42, warm embedding. The yardstick is sibling variance: two seeds at
+100 steps differ by **0.113 m** pelvis-relative, so that is the scale against which a
+step-count change has to be judged.
+
+| steps | 4 variants | vs 15 s budget | divergence from 100 | as % of sibling variance |
+|---|---|---|---|---|
+| 100 | 19.37 s | missed by 29% | — | — |
+| **75** | **14.77 s** | **inside** | 0.008 m | 7% |
+| 50 | 9.98 s | 33% under | 0.029 m | 26% |
+| 25 | 5.12 s | 66% under | 0.072 m | 64% |
+
+**Fewer steps do not corrupt the motion — they change which motion you get.** Physical
+soundness holds everywhere: max bone-length cv 0.008–0.009%, zero foot-through-floor
+frames, mean jerk 0.19–0.20 mm at every setting. But at 25 steps the step count displaces
+the body by two-thirds of what changing the seed does, which makes it a second, hidden
+seed — and a ghost-cloud read against it would be reading its own configuration.
+
+75 is the highest setting inside the budget and diverges from full quality by an order of
+magnitude less than a seed change. Whether 75-step motion *reads* as well as 100-step is a
+judgement for the studio, not a metric.
+
+Caveat: one prompt, one seed. The divergence figures are indicative, not a distribution.
+
+### Steps as a control
+
+`denoising_steps` is now a request parameter on `POST /generate`, defaulting to `None`
+(the worker's configured `BODYPROMPT_DIFFUSION_STEPS`, still 100), and a number box in the
+prompt bar taking 1–100 — left empty it sends nothing and the worker decides. The API
+accepts up to 500; the box stops at 100 because that is Kimodo's own default and nothing
+above it has been calibrated here. Typed values are clamped in the UI rather than sent and
+refused, so a typo cannot read as a failed generation. It follows `post_processing`
+exactly: meaningless to fixture backends, which
+record `None`, and always recorded in provenance as **the count the worker actually used**
+— never the absence of a request. Without that, a 25-step motion and a 100-step motion
+would be indistinguishable in the record, which given the numbers above would have made
+the ghost-cloud unreadable.
+
+It is an absolute count, not a fraction: 100 is Kimodo's own CLI default, not a ceiling.
 
 **Post-processing earns its toolchain.** Same prompt, same seed: raw output puts a toe
 through the floor on 13 of 150 frames, post-processed on none.
@@ -170,17 +259,14 @@ so this is recorded rather than corrected.
 walked 2.31, 3.12, 3.64 and 4.77 metres. World-space divergence averages 0.72 m but only
 0.19 m of that is pose. The ghost-cloud renders siblings in world space, so most of what an
 audience sees is bodies standing in different places rather than one intention explored
-four ways. Whether the cloud should align siblings at the pelvis is a question about the
-instrument, not a bug, and is left open.
+four ways. That is a question about the instrument, not a bug: the displacement is real
+variance and stays in the performance view. An optional pelvis-aligned view is parked
+against v2.5 — see the roadmap in README.md.
 
 ### Still requiring work
 
-- Decide whether variants batch into one `num_samples=N` call — the 15-second budget is
-  currently missed by 65% — and only then run the 100/75/50/25-step calibration.
-- Replace the temporary Kimodo `main` installation reference with `1aece8c`.
 - Judge notation readability against real motion, now that the floor path must fit several
   metres of travel and the Laban support column has genuine foot-contact data.
-- Decide whether the ghost-cloud aligns siblings at the pelvis.
 
 **v1 has generated real movement, and the canonical motion is anatomically sound.** What
 remains is calibration and instrument design, not whether the boundary works. Only output

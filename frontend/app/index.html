@@ -42,6 +42,25 @@
             <option value="10">10 s</option>
           </select>
         </label>
+        <!-- Kimodo's denoising steps. An absolute count, not a fraction of anything:
+             fewer steps takes a coarser path to a fully denoised motion. Below 75 the
+             step count starts shifting the motion by a sizeable fraction of what a
+             seed change does, so it stops being a free speed dial. Empty = the
+             worker's configured default, which the placeholder names. -->
+        <label class="duration">
+          <span>steps</span>
+          <input
+            id="steps"
+            class="model-select steps-input"
+            type="number"
+            min="1"
+            max="100"
+            step="1"
+            placeholder="100"
+            title="Denoising steps, 1–100. Empty uses the worker default."
+            aria-label="Denoising steps"
+          />
+        </label>
         <button id="generate" class="btn">Generate</button>
         <span id="generation-status" class="generation-status" aria-live="polite"></span>
       </div>

@@ -26,6 +26,10 @@ export interface CanonicalMotion {
     backend: string;
     model_version: string;
     inference_ms: number;
+    /** Kimodo's foot-skate cleanup: what the worker did, not what was asked. */
+    post_processing?: boolean | null;
+    /** DDIM steps actually used — absolute count. Null for fixtures. */
+    denoising_steps?: number | null;
   };
   /** True when the motion came from the v0 stub rather than a model. */
   stub?: boolean;
