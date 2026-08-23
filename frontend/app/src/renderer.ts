@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { CanonicalMotion } from "./types";
+import { buildTimeline, entryAt, type TimelineEntry } from "./timeline";
 import { JOINT_INDEX, LANDMARK_JOINTS, TRAIL_JOINTS } from "./skeleton";
 
 // House palette (matches frontend/mockups/styles.css).
@@ -31,7 +32,18 @@ export type FrameListener = (info: {
   total: number;
   fps: number;
   playing: boolean;
+  /** Which line of the poem the playhead is inside. 0 when there is only one clip. */
+  segmentIndex: number;
 }) => void;
+
+/**
+ * What happens at the end.
+ *
+ * `whole` runs the poem round; `line` holds the playhead inside one line so it can be
+ * worked on; `none` stops at the end. Until v2 this was a single unconditional subtraction
+ * — a clip could only ever loop.
+ */
+export type LoopMode = "whole" | "line" | "none";
 
 /** Options per renderer instance — the triptych colour-codes one panel per model. */
 export interface RendererOptions {
@@ -62,11 +74,15 @@ export class StickFigureRenderer {
   private ghostsVisible = true;
 
   // playback
-  private motion?: CanonicalMotion;
+  private motion?: CanonicalMotion; // the clip geometry and fps come from — entry 0's clip
+  private timeline: TimelineEntry[] = [];
+  private totalFrames = 0;
   private frameFloat = 0;
   private playing = false;
   private listener?: FrameListener;
   private tempo = 1; // 0.5 = half speed — the performer needs time to read and follow
+  private loopMode: LoopMode = "whole";
+  private loopIndex: number | null = null;
 
   // the stage itself: a lab bench is lit for inspection, a performance is lit for a room
   private grid?: THREE.GridHelper;
@@ -115,12 +131,73 @@ export class StickFigureRenderer {
    * Also builds the ghost-cloud from `motion.variants` (if the service sent any).
    */
   load(motion: CanonicalMotion): void {
-    this.motion = motion;
-    this.frameFloat = 0;
-    this.buildFigure(motion);
-    this.loadGhosts(motion.variants ?? []);
-    this.applyFrame(0);
+    this.loadSequence([motion], { ghosts: motion.variants ?? [] });
+  }
+
+  /**
+   * Play a poem: one clip per line for a draft, or a single segmented clip for a bake.
+   *
+   * Both shapes become the same timeline, so playback, scrubbing and "which line is moving"
+   * work identically — but they are not made to *look* the same. A draft's clips were
+   * generated blind to each other and the body will jump between them; nothing here
+   * smooths that over, because the jump is the honest signal that the poem has not been
+   * baked yet.
+   */
+  loadSequence(
+    clips: CanonicalMotion[],
+    opts: { ghosts?: CanonicalMotion[]; keepPlayhead?: boolean } = {},
+  ): void {
+    if (clips.length === 0) return;
+    const previous = this.frameFloat;
+    this.motion = clips[0];
+    this.timeline = buildTimeline(clips);
+    this.totalFrames = this.timeline.reduce((sum, e) => sum + e.length, 0);
+    this.frameFloat = opts.keepPlayhead
+      ? Math.min(previous, Math.max(0, this.totalFrames - 1))
+      : 0;
+    this.buildFigure(clips[0]);
+    this.loadGhosts(opts.ghosts ?? []);
+    this.applyFrame(this.frameFloat);
     this.play();
+  }
+
+  /** Where the playhead is, as a line index. */
+  get segmentIndex(): number {
+    return this.entryAt(this.frameFloat)?.index ?? 0;
+  }
+
+  /**
+   * What happens at the end of the poem — or of one line.
+   *
+   * `loopLine` is the "only loop on a sentence when I choose to" control: it pins the
+   * playhead inside one line so the writer can watch it over and over while editing.
+   */
+  setLoop(mode: LoopMode, lineIndex: number | null = null): void {
+    this.loopMode = mode;
+    this.loopIndex = mode === "line" ? lineIndex : null;
+  }
+
+  /** Jump the playhead to the start of a line. */
+  seekSegment(index: number): void {
+    const entry = this.timeline.find((e) => e.index === index);
+    if (!entry) return;
+    this.frameFloat = entry.globalStart;
+    this.applyFrame(this.frameFloat);
+    this.emit();
+  }
+
+  private entryAt(frame: number): TimelineEntry | undefined {
+    const i = Math.max(0, Math.min(this.totalFrames - 1, Math.round(frame)));
+    return entryAt(this.timeline, i);
+  }
+
+  /** Resolve a global frame to the actual pose behind it. */
+  private poseAt(frame: number): number[][] | undefined {
+    const entry = this.entryAt(frame);
+    if (!entry) return undefined;
+    const i = Math.max(0, Math.min(this.totalFrames - 1, Math.round(frame)));
+    const local = entry.localStart + (i - entry.globalStart);
+    return entry.clip.frames[Math.min(local, entry.clip.frames.length - 1)]?.positions;
   }
 
   /**
@@ -204,7 +281,7 @@ export class StickFigureRenderer {
   /** Seek to a normalised position in [0, 1]. */
   seek(fraction: number): void {
     if (!this.motion) return;
-    const last = this.motion.frames.length - 1;
+    const last = Math.max(0, this.totalFrames - 1);
     this.frameFloat = Math.max(0, Math.min(1, fraction)) * last;
     this.applyFrame(this.frameFloat);
     this.emit();
@@ -277,9 +354,10 @@ export class StickFigureRenderer {
   private applyFrame(frameFloat: number): void {
     const motion = this.motion;
     if (!motion || !this.bonePositions) return;
-    const total = motion.frames.length;
+    const total = this.totalFrames;
     const i = Math.max(0, Math.min(total - 1, Math.round(frameFloat)));
-    const pos = motion.frames[i].positions;
+    const pos = this.poseAt(i);
+    if (!pos) return;
 
     // joints
     for (let j = 0; j < this.jointMeshes.length; j++) {
@@ -303,8 +381,8 @@ export class StickFigureRenderer {
     for (const [idx, ghosts] of this.trailMeshes) {
       for (let k = 0; k < ghosts.length; k++) {
         const sample = Math.max(0, i - (k + 1) * TRAIL_STEP);
-        const p = motion.frames[sample].positions[idx];
-        ghosts[k].position.set(p[0], p[1], p[2]);
+        const p = this.poseAt(sample)?.[idx];
+        if (p) ghosts[k].position.set(p[0], p[1], p[2]);
       }
     }
 
@@ -331,10 +409,19 @@ export class StickFigureRenderer {
     requestAnimationFrame(this.animate);
     const dt = this.clock.getDelta();
 
-    if (this.playing && this.motion) {
-      const last = this.motion.frames.length - 1;
+    if (this.playing && this.motion && this.totalFrames > 0) {
+      const [from, to] = this.loopBounds();
       this.frameFloat += dt * this.motion.fps * this.tempo;
-      if (this.frameFloat > last) this.frameFloat -= last; // loop
+      if (this.frameFloat > to) {
+        if (this.loopMode === "none") {
+          this.frameFloat = to;
+          this.playing = false;
+        } else {
+          // Wrap into the looped span rather than to frame 0: looping one line has to come
+          // back to that line's beginning, not the poem's.
+          this.frameFloat = from + (this.frameFloat - to);
+        }
+      }
       this.applyFrame(this.frameFloat);
       this.emit();
     }
@@ -343,13 +430,24 @@ export class StickFigureRenderer {
     this.renderer.render(this.scene, this.camera);
   };
 
+  /** The span the playhead is confined to, given the current loop mode. */
+  private loopBounds(): [number, number] {
+    const last = Math.max(0, this.totalFrames - 1);
+    if (this.loopMode === "line" && this.loopIndex !== null) {
+      const entry = this.timeline.find((e) => e.index === this.loopIndex);
+      if (entry) return [entry.globalStart, entry.globalStart + entry.length - 1];
+    }
+    return [0, last];
+  }
+
   private emit(): void {
     if (!this.listener || !this.motion) return;
     this.listener({
       frame: Math.round(this.frameFloat),
-      total: this.motion.frames.length,
+      total: this.totalFrames,
       fps: this.motion.fps,
       playing: this.playing,
+      segmentIndex: this.segmentIndex,
     });
   }
 
