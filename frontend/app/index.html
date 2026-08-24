@@ -105,7 +105,15 @@
 
         <!-- The legible reduction: movement you can read, compare, and re-embody. -->
         <aside class="rail rail-right">
-          <div id="score-title" class="rail-title">notation · the score</div>
+          <div class="rail-title score-head">
+            <span id="score-title">notation · the score</span>
+            <!-- Read the whole poem coarsely, or one line at full scale. The registers
+                 normalise against whatever they are given, so these are two different
+                 readings and not a zoom — the title says which one is on screen. -->
+            <button id="score-scope" class="scope-btn" title="Read one line at a time (N)">
+              whole poem
+            </button>
+          </div>
           <div class="rail-scroll">
             <div class="nota-block">
               <div class="nota-cap">phrase · per limb</div>

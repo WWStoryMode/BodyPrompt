@@ -145,12 +145,73 @@ excluded from `tsc` because `@types/node` cannot currently be installed — the 
 has a **pre-existing** `typedoc-plugin-markdown` / `typedoc` / rollup peer conflict, unrelated
 to this work, and the app build should not wait on resolving it.
 
-### Still to come
+### 2026-08-24 — Stage C, the registers read a line
 
-- **Stage C** — the notation registers, which currently subdivide the whole clip by fixed
-  counts (16 buckets, 7 poses, 6 beats) and normalise per clip. A five-line poem would get
-  roughly 1.4 chronophotograph poses per line, and the loudest line would set the scale for
-  the quiet ones.
+The four registers each divide whatever they are handed by a fixed count — 16 buckets, 7
+exposures, 6 beats — and normalise against its range. Given a five-line poem that stayed
+*correct* and stopped being *readable*: about 1.4 chronophotograph exposures per line, and
+the loudest line setting the scale the quiet ones are drawn against.
+
+Every `render*` now takes a `RegisterView`:
+
+```ts
+interface RegisterView {
+  range?: { start: number; end: number };  // read one line instead of the poem
+  globalStart?: number;                    // where this register sits in global frames
+  boundaries?: number[];                   // global frames where a line begins
+}
+```
+
+**A narrowed register is a re-reading, not a crop.** The range slices the frames *before*
+any register normalises, so one line is drawn at the same resolution the whole poem was —
+16 buckets, 7 exposures — against its own range. A held breath between two large phrases,
+invisible in the whole-poem reading, gets a whole plate to itself.
+
+The cost is real and is stated on the rail rather than hidden: **two registers at different
+ranges are not comparable**. The title says which reading is on screen — `notation · line 2`
+versus `notation · the score` — and the button beside it (`N`) says the same thing again.
+
+**The playhead learned to say nothing.** Playheads arrive in global frames; a register that
+holds only part of the poem now maps them through its own window and **hides** its marker
+while the body is somewhere it cannot see. Parking the marker at an edge would have been the
+easy thing and would have claimed the body was at the end of a line it had already left. The
+chronophotograph does the same with its lit exposure.
+
+That mapping also fixed a **Stage B bug**: on a *drafted* poem the registers hold one clip
+out of several, but were being fed the whole run's global frame, so the "now" marker walked
+off the end of the register it was drawn on. Two neighbouring bugs of the same family went
+with it — `poem.written[segmentIndex]` and the two `poem.written.findIndex` calls behind
+double-click-to-jump and loop-this-line counted *written* lines, while segment indices count
+the lines actually **on the stage**. With three written lines and only the third drafted,
+the instrument highlighted line 1 and looped the wrong clip. All three now go through
+`playingLines`, which is set to whatever the stage is actually holding.
+
+**Seams, only where they are earned.** In the whole-poem reading the notation strip draws a
+dashed rule and the floor path a tick across the trace at each line boundary — the floor's
+tick is drawn square to the direction of travel, so it crosses the path instead of lying
+along it. A boundary at a window's own first frame is not a seam inside it and is dropped,
+or every narrowed register would carry a rule down its left margin.
+
+**Drafts get no seam marks at all.** Drafted lines have joins, not seams: they were generated
+apart, the body jumps, and drawing that break as a transition would be precisely the kind of
+flattery this repository exists not to do. The banner already says it in words; the score
+stays silent rather than saying something else.
+
+**What is tested and what is not.** The windowing arithmetic moved into `src/register-view.ts`
+— pure, no DOM — for the same reason `timeline.ts` sits outside the renderer: it is the part
+that can be wrong without *looking* wrong, since a mis-mapped playhead sits confidently on
+the wrong line. `register-view.test.ts` covers the mapping and the seam filtering;
+`notation.test.ts` builds the SVG against a ~40-line DOM stub (no jsdom — a dependency still
+cannot be added) and checks that a narrowed register keeps its full glyph count, that seams
+appear only on a bake, and that playheads and lit exposures disappear off-window. 23 frontend
+tests pass.
+
+What none of that checks is whether any of it is **legible** — whether 7 exposures is right
+for a two-second line, whether per-line normalisation flatters a weak line into looking
+strong. That is a studio judgement and it stays one; it is the parked "notation readability"
+question, and Stage C only makes it askable.
+
+### Still to come
 
 Nothing here is persisted. A reload still destroys the poem; that is deliberate and
 deferred.

@@ -170,7 +170,7 @@ in front of an audience:
 |---------|--------------------|-------|
 | **v0** | Research proposition + mock interfaces | ✓ done |
 | **v0.5** | First functional slice — the search loop runs on **stub** data (schema + renderer + service, no ML) | ✓ done |
-| **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ◐ generating; editor in progress |
+| **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
@@ -214,7 +214,10 @@ with the instrument rather than code still owed. Both wait until the system is f
 - **Whether the four notation registers stay legible against real motion.** They were
   designed against stub data — which turned out to mis-model leg variance by eleven to
   twenty times — and now have several metres of travel and genuine foot-contact data to
-  carry.
+  carry. v2 gave them a *scale* to be judged at: a register reads the whole poem coarsely or
+  one line at full resolution (<kbd>N</kbd>). Which is the right reading for which question —
+  and whether reading a quiet line at its own scale clarifies it or flatters it — is exactly
+  the judgement that has to be made with a body in the room, not in code.
 
 ---
 

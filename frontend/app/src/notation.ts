@@ -21,7 +21,9 @@
 // (Designing this reduction is itself part of the research; see the README.)
 
 import type { CanonicalMotion } from "./types";
-import { JOINT_INDEX } from "./skeleton";
+import { JOINT_INDEX } from "./skeleton.ts";
+import { fraction, windowOf, type RegisterView } from "./register-view.ts";
+export type { RegisterView } from "./register-view.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -73,9 +75,12 @@ const STRIP_W = 300;
  */
 export function renderNotationStrip(
   svg: SVGSVGElement,
-  motion: CanonicalMotion,
+  source: CanonicalMotion,
+  view: RegisterView = {},
 ): (frame: number) => void {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const w = windowOf(source, view);
+  const motion = w.motion;
 
   const height = TRACKS.length * ROW_H + 14;
   const plotW = STRIP_W - LABEL_W - 8;
@@ -156,6 +161,18 @@ export function renderNotationStrip(
     });
   });
 
+  // where the lines meet — drawn over the score, under the playhead
+  const seamX = (i: number) => LABEL_W + fraction(i, nFrames) * plotW;
+  for (const i of w.seams) {
+    svg.appendChild(
+      el("line", {
+        x1: seamX(i).toFixed(1), y1: "2",
+        x2: seamX(i).toFixed(1), y2: String(height - 6),
+        class: "nota-seam",
+      }),
+    );
+  }
+
   // the "now" playhead
   const playhead = el("line", {
     x1: String(LABEL_W), y1: "2",
@@ -165,8 +182,12 @@ export function renderNotationStrip(
   svg.appendChild(playhead);
 
   return (frame: number) => {
-    const t = nFrames > 1 ? frame / (nFrames - 1) : 0;
-    const x = LABEL_W + t * plotW;
+    const i = w.local(frame);
+    // The body is in a line this register is not reading — say nothing rather than park
+    // the marker at an edge it is not at.
+    playhead.setAttribute("visibility", i < 0 ? "hidden" : "visible");
+    if (i < 0) return;
+    const x = LABEL_W + fraction(i, nFrames) * plotW;
     playhead.setAttribute("x1", String(x));
     playhead.setAttribute("x2", String(x));
   };
@@ -185,9 +206,12 @@ const MIN_SPAN = 0.7; // metres — stops a nearly-still motion being magnified 
  */
 export function renderFloorPath(
   svg: SVGSVGElement,
-  motion: CanonicalMotion,
+  source: CanonicalMotion,
+  view: RegisterView = {},
 ): (frame: number) => void {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const w = windowOf(source, view);
+  const motion = w.motion;
   svg.setAttribute("viewBox", `0 0 ${FLOOR_W} ${FLOOR_H}`);
   svg.setAttribute("width", "100%");
 
@@ -246,6 +270,27 @@ export function renderFloorPath(
   svg.appendChild(el("path", { d: toPath(right), class: "floor-foot" }));
   svg.appendChild(el("path", { d: toPath(pelvis), class: "floor-trace" }));
 
+  // where each line handed the body to the next — a tick across the trace, so the seams
+  // are read on the floor as places rather than as moments
+  for (const i of w.seams) {
+    const [bx, bz] = pelvis[Math.min(i, pelvis.length - 1)];
+    const prev = pelvis[Math.max(0, i - 1)];
+    // square to the direction of travel, so the tick crosses the path rather than lying
+    // along it; a standing body gets an arbitrary but stable direction
+    const dx = px(bx) - px(prev[0]);
+    const dy = py(bz) - py(prev[1]);
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * 4;
+    const ny = (dx / len) * 4;
+    svg.appendChild(
+      el("line", {
+        x1: (px(bx) - nx).toFixed(1), y1: (py(bz) - ny).toFixed(1),
+        x2: (px(bx) + nx).toFixed(1), y2: (py(bz) + ny).toFixed(1),
+        class: "floor-seam",
+      }),
+    );
+  }
+
   // where it began
   svg.appendChild(
     el("circle", { cx: String(px(pelvis[0][0])), cy: String(py(pelvis[0][1])), r: "3", class: "floor-start" }),
@@ -256,9 +301,12 @@ export function renderFloorPath(
   svg.appendChild(now);
 
   return (frame: number) => {
-    const i = Math.max(0, Math.min(pelvis.length - 1, frame));
-    now.setAttribute("cx", String(px(pelvis[i][0])));
-    now.setAttribute("cy", String(py(pelvis[i][1])));
+    const i = w.local(frame);
+    now.setAttribute("visibility", i < 0 ? "hidden" : "visible");
+    if (i < 0) return;
+    const at = Math.min(i, pelvis.length - 1);
+    now.setAttribute("cx", String(px(pelvis[at][0])));
+    now.setAttribute("cy", String(py(pelvis[at][1])));
   };
 }
 
@@ -297,9 +345,12 @@ const SIN_T = Math.sin(TURN);
  */
 export function renderChronophotograph(
   svg: SVGSVGElement,
-  motion: CanonicalMotion,
+  source: CanonicalMotion,
+  view: RegisterView = {},
 ): (frame: number) => void {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const w = windowOf(source, view);
+  const motion = w.motion;
   svg.setAttribute("viewBox", `0 0 ${CHRONO_W} ${CHRONO_H}`);
   svg.setAttribute("width", "100%");
 
@@ -358,11 +409,13 @@ export function renderChronophotograph(
   let lit = -1;
   return (frame: number) => {
     // which exposure is the playback standing in?
-    const t = nFrames > 1 ? frame / (nFrames - 1) : 0;
-    const i = Math.max(0, Math.min(POSES - 1, Math.round(t * (POSES - 1))));
+    const at = w.local(frame);
+    // Outside this register's line: no exposure is the present one. Leaving the last one
+    // lit would keep claiming the body is in a pose it has already left.
+    const i = at < 0 ? -1 : Math.max(0, Math.min(POSES - 1, Math.round(fraction(at, nFrames) * (POSES - 1))));
     if (i === lit) return;
     if (lit >= 0) poses[lit].classList.remove("now");
-    poses[i].classList.add("now");
+    if (i >= 0) poses[i].classList.add("now");
     lit = i;
   };
 }
@@ -452,9 +505,12 @@ function levelOf(kind: "arm" | "leg", jointY: number, anchorY: number): Level {
  */
 export function renderLabanScore(
   svg: SVGSVGElement,
-  motion: CanonicalMotion,
+  source: CanonicalMotion,
+  view: RegisterView = {},
 ): (frame: number) => void {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const w = windowOf(source, view);
+  const motion = w.motion;
   svg.setAttribute("viewBox", `0 0 ${LABAN_W} ${LABAN_H}`);
   svg.setAttribute("width", "100%");
 
@@ -591,8 +647,10 @@ export function renderLabanScore(
   svg.appendChild(now);
 
   return (frame: number) => {
-    const t = nFrames > 1 ? frame / (nFrames - 1) : 0;
-    const y = (floor - t * BEATS * rowH).toFixed(1);
+    const i = w.local(frame);
+    now.setAttribute("visibility", i < 0 ? "hidden" : "visible");
+    if (i < 0) return;
+    const y = (floor - fraction(i, nFrames) * BEATS * rowH).toFixed(1);
     now.setAttribute("y1", y);
     now.setAttribute("y2", y);
   };
