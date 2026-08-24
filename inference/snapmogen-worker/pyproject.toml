@@ -1,7 +1,7 @@
 [project]
-name = "bodyprompt-kimodo-worker"
+name = "bodyprompt-snapmogen-worker"
 version = "0.1.0"
-description = "Local Kimodo inference and SOMA-to-BodyPrompt canonical adapter."
+description = "Local SnapMoGen inference and its adapter to the BodyPrompt canonical skeleton."
 requires-python = ">=3.10,<3.12"
 dependencies = [
     "bodyprompt-motion",
@@ -19,9 +19,8 @@ dev = [
 [tool.uv]
 default-groups = ["dev"]
 
-# The canonical skeleton and the model-independent half of adapting to it, shared with the
-# other workers. A path dependency rather than a copy: drift here does not crash, it
-# returns a plausible-looking body with false anatomy.
+# Shared with the Kimodo worker. A path dependency rather than a copy: drift in the
+# canonical core does not crash, it returns a plausible-looking body with false anatomy.
 [tool.uv.sources]
 bodyprompt-motion = { path = "../common", editable = true }
 

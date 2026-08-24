@@ -20,3 +20,8 @@ venv/
 build/
 *.egg-info/
 .env
+
+# Model weights: large, and SnapMoGen's are under Snap Inc.'s non-commercial licence,
+# which is not this repository's to redistribute. See the README in that directory.
+inference/snapmogen-worker/checkpoints/*
+!inference/snapmogen-worker/checkpoints/README.md

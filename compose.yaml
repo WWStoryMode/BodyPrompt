@@ -25,7 +25,10 @@ services:
 
   kimodo-worker:
     profiles: ["local-gpu"]
-    build: ./inference/kimodo-worker
+    build:
+      # inference/, so the shared canonical package is inside the build context.
+      context: ./inference
+      dockerfile: kimodo-worker/Dockerfile
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
       # Model loading prints to stdout, which Python buffers when it is not a terminal.
@@ -45,6 +48,30 @@ services:
     volumes:
       - huggingface-cache:/root/.cache/huggingface
       - embedding-cache:/root/.cache/kimodo/embeddings
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Real as of v3 Stage B. Cheap enough to leave resident beside Kimodo: ~2 GB RSS and
+  # 0.6 GB VRAM, against Kimodo's 16-17.8 GB. Needs its checkpoints mounted — see the
+  # README in its checkpoints/ directory — and reports ready:false naming what is missing.
+  snapmogen-worker:
+    profiles: ["local-gpu", "snapmogen"]
+    build:
+      context: ./inference
+      dockerfile: snapmogen-worker/Dockerfile
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # Weights and the 5 KB of dataset statistics, mounted rather than baked — large, and
+      # under Snap Inc.'s non-commercial licence.
+      - ./inference/snapmogen-worker/checkpoints:/checkpoints:ro
+      - ./inference/snapmogen-worker/meta:/meta:ro
+      - huggingface-cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:

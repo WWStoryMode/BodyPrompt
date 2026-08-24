@@ -35,8 +35,14 @@ RUN apt-get update \
 RUN python3.10 -m pip install --no-cache-dir \
       "git+https://github.com/nv-tlabs/kimodo.git@1aece8c124d73d255ceff5086d983b844c9f4e94"
 
-COPY pyproject.toml .
-COPY app app
+# Build context is inference/, not this directory, so the shared canonical package can be
+# copied in. Installed before the worker, because the worker declares it as a dependency
+# and it is on no index.
+COPY common /common
+RUN python3.10 -m pip install --no-cache-dir /common
+
+COPY kimodo-worker/pyproject.toml .
+COPY kimodo-worker/app app
 RUN python3.10 -m pip install --no-cache-dir .
 EXPOSE 8010
 CMD ["python3.10", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]

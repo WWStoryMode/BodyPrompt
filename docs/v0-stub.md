@@ -143,16 +143,60 @@ building the instrument first was worth doing:
 
 ## Retiring the fakes
 
-The v1 Kimodo backend retires the prompt hash, synthetic variance and empty rotations **for
-outputs whose provenance says `source: kimodo`**. The explicitly labelled SnapMoGen and
-Language of Motion fixtures keep those stand-ins. The triptych cannot become a real
-three-model comparison until it has three real providers.
+The v1 Kimodo backend retired the prompt hash, synthetic variance and empty rotations **for
+outputs whose provenance says `source: kimodo`**. As of **v3 Stage B (2026-08-24)**,
+`source: snapmogen` does the same: SnapMoGen reads the prompt, samples its own variance, and
+returns real rotations.
 
-| Fake | Retired by |
-|---|---|
-| #1 the prompt hash | the model reading the prompt |
-| #2 the triptych's model signature | three actual models — not completed by single-model v1 |
-| #3 the ghost-cloud perturbation | asking the model for *n* samples |
+**Fake #2 is therefore two-thirds retired.** The hash collision described above — the one
+that made the SnapMoGen and Kimodo panels identical row for row — no longer applies to
+either of them; only Language of Motion still selects a fixture by hashing. So the triptych
+now compares **two real models and one stand-in**, and its banner has to say exactly that
+rather than "the models are not real". A screenshot of it is still not a three-model
+comparison.
+
+| Fake | Retired by | State |
+|---|---|---|
+| #1 the prompt hash | the model reading the prompt | ✓ for kimodo and snapmogen |
+| #2 the triptych's model signature | three actual models | ◐ two of three real |
+| #3 the ghost-cloud perturbation | asking the model for *n* samples | ✓ for kimodo and snapmogen |
+
+### What is real about SnapMoGen, and what to be careful of
+
+Measured on the RTX 5080, 2026-08-24, and none of it is a stub:
+
+- Bone-length coefficient of variation **0.0075–0.0154%** across all 21 bones — the check
+  that validates the joint map.
+- "A person is walking confidently" travels **4.20 m** in 5 s and its ghost-cloud siblings
+  spread **0.26–1.30 m** apart. That is a model interpreting a prompt, not a hash.
+
+Three things a reader must know before drawing a conclusion from it:
+
+1. **A poetic prompt gets very little movement out of it.** "a body remembers a place it
+   cannot return to" returns a body that barely moves — 0.03 m of travel and a **0.03 m**
+   wrist span, against 3.95 m and 3.95 m for "A person walks forward and turns around."
+   SnapMoGen was trained on literal, expressive descriptions of physical action. It does not
+   fail loudly on anything else; it returns a person standing nearly still.
+
+   **This is not a SnapMoGen defect, and the first version of this note wrongly implied it
+   was.** Measured across five prompts, *both* real models articulate less for poetic
+   phrasing than for literal instruction — Kimodo gives the same phrase a 0.18 m wrist span,
+   also nearly nothing. SnapMoGen is the more literal of the two, but the tendency is shared.
+
+   Two scalars over five prompts is an **observation, not a result**. It is exactly the
+   question the instrument was built to ask, and answering it properly is research, not
+   another commit.
+2. **A short line is answered by a longer motion.** SnapMoGen will not generate below 128
+   frames (4.27 s), so a 2-second poem line is answered by 4.27 seconds. `frames_asked` and
+   `frames_used` are both recorded.
+3. **Feet penetrate the floor by up to 4.5 cm** while walking. Kimodo's zero comes from its
+   post-processing pass; SnapMoGen's equivalent (its GlobalRegressor) is not wired up yet,
+   and `provenance.post_processing` says `false` accordingly.
+
+Its rig is also **not metric** — the rest-pose head joint sits at 93.08 rig units — so the
+worker scales it by a stated convention, measured from the rig at load time and recorded in
+each motion as `rig_scale`. Read as centimetres it would be an 0.85 m body, which the Laban
+score would read as a permanent crouch.
 | #4 identity rotations | a model that emits them |
 
 The one thing v1 must not do is return **rendered video**. Several hosted motion-generation
