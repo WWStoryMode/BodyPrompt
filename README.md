@@ -173,6 +173,7 @@ in front of an audience:
 | **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
+| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; no new model yet |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
