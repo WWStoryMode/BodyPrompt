@@ -193,6 +193,12 @@ big phrases reads as nothing at all, which is a failure of the register, not of 
 So the score rail has a switch: **whole poem** or **this line**. Press <kbd>N</kbd>, or click
 the button next to the rail's title.
 
+**"This line" means the line the body is playing**, not the line your cursor is in. The score
+is a reading of the movement, so it says what the body is doing now — and while you write,
+your cursor is usually somewhere else. It follows the playhead across each boundary. If you
+want the score to stay on one line, **loop that line** (<kbd>L</kbd>): pin the body and the
+score stays with it.
+
 **This is not a zoom.** A narrowed register re-reads one line at full resolution against its
 own range — the same 16 buckets, the same 7 exposures, renormalised. The held breath gets a
 whole plate to itself and becomes legible. The cost is the obvious one, and it is worth
@@ -203,12 +209,14 @@ stating plainly:
 > title says which reading is on screen (`notation · line 2` versus `notation · the score`)
 > for exactly that reason.
 
-The playhead follows. While the body is in another line, a narrowed register **hides its
-"now" marker** rather than parking it at an edge — the register cannot see where the body is,
-so it says nothing instead of something false.
-
 Narrowing needs a **baked** poem of more than one line; the button is disabled otherwise. A
-drafted line is already its own separate clip, so the registers are already reading it alone.
+drafted line is already its own separate clip, so the registers are already reading it alone
+— and there they follow the **selected** line, because that is what the ghost-cloud is
+showing you and what you are rewriting.
+
+Which means a register can be holding a line the body is not in: a drafted line while another
+plays. When that happens it **hides its "now" marker** rather than parking it at an edge. The
+register cannot see where the body is, so it says nothing rather than something false.
 
 **Where the lines meet.** In the whole-poem reading, the notation strip draws a dashed rule
 and the floor path a tick across the trace at every line boundary — so you can see which part

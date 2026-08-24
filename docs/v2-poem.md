@@ -171,11 +171,21 @@ The cost is real and is stated on the rail rather than hidden: **two registers a
 ranges are not comparable**. The title says which reading is on screen — `notation · line 2`
 versus `notation · the score` — and the button beside it (`N`) says the same thing again.
 
+**A narrowed register follows the body, not the cursor.** The first build had it follow the
+*selected* line, which was wrong in use and wrong in principle: while you write, the cursor is
+somewhere the body is not, so the score described a line nobody was watching — and until you
+clicked a line it described nothing at all. The score is a reading of the movement, so it
+reads the line the playhead is inside and re-reads at each boundary (once per line, not per
+frame). Pinning a line to study it is what looping already does: pin the body and the score
+stays with it.
+
 **The playhead learned to say nothing.** Playheads arrive in global frames; a register that
-holds only part of the poem now maps them through its own window and **hides** its marker
-while the body is somewhere it cannot see. Parking the marker at an edge would have been the
-easy thing and would have claimed the body was at the end of a line it had already left. The
-chronophotograph does the same with its lit exposure.
+holds only part of the poem maps them through its own window and **hides** its marker while
+the body is somewhere it cannot see. Parking it at an edge would have been the easy thing and
+would have claimed the body was at the end of a line it had already left. The chronophotograph
+does the same with its lit exposure. Following the body means a narrowed *baked* register is
+now always looking at the body — the hiding still matters for a drafted line, where the
+register holds the line being rewritten while another one plays.
 
 That mapping also fixed a **Stage B bug**: on a *drafted* poem the registers hold one clip
 out of several, but were being fed the whole run's global frame, so the "now" marker walked

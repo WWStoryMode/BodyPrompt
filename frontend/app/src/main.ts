@@ -202,9 +202,9 @@ function selectLine(id: number): void {
   if (poem.selectedId === id) return;
   poem.selectedId = id;
   renderPoem();
-  // The registers and the ghost-cloud follow the line being worked on.
+  // The ghost-cloud follows the line being worked on. The registers do not — they follow
+  // the body (see `registerView`).
   if (!poem.bakeIsCurrent) showCurrent({ keepPlayhead: true });
-  else buildScore(); // a baked poem stays on the stage; only the reading moves
 }
 
 function focusLine(id: number, caret?: number): void {
@@ -378,23 +378,33 @@ function setComparing(on: boolean): void {
 let reading = false;
 
 /**
- * Which reading the registers give: the whole poem, or the selected line alone.
+ * Which reading the registers give: the whole poem, or one line of it.
  *
  * These are not zoom levels. Every register normalises against the frames it is handed —
  * levels, magnitudes, the floor's scale — so a line read alone is drawn against its own
  * range, and a quiet line that vanishes inside the whole poem becomes legible. That also
  * means the two readings cannot be compared with each other, which is why the rail says
  * out loud which one is on screen.
+ *
+ * Narrowed, the register follows the line the body is **playing**, not the line the cursor
+ * is in. The score is a reading of the movement, so it should say what the body is doing
+ * now; the writer's cursor is somewhere else most of the time, and a score that followed it
+ * would describe a line nobody is watching. Pinning a line is what looping is for (`L`),
+ * and it works on the score for free — pin the body and the score stays with it.
  */
 type ScoreScope = "poem" | "line";
 let scoreScope: ScoreScope = "poem";
+
+/** The line a narrowed register is reading: the one the playhead is inside. */
+function readingSegment(): number {
+  return renderer.segmentIndex;
+}
 
 /** The window the registers should read, for whatever is currently on the stage. */
 function registerView(): RegisterView {
   const segments = current?.segments ?? [];
   if (scoreScope === "line" && segments.length) {
-    const at = playingLines.findIndex((line) => line.id === poem.selectedId);
-    const segment = at >= 0 ? segments[at] : undefined;
+    const segment = segments[readingSegment()];
     if (segment) {
       return {
         range: { start: segment.start_frame, end: segment.end_frame },
@@ -413,14 +423,14 @@ function updateScoreHead(): void {
   scoreScopeEl.disabled = segments.length < 2;
   scoreScopeEl.title = scoreScopeEl.disabled
     ? "one line at a time — needs a baked poem of more than one line"
-    : "Read one line at a time (N)";
+    : "Read the line the body is playing (N)";
   const narrowed = scoreScope === "line" && !scoreScopeEl.disabled;
   scoreScopeEl.textContent = narrowed ? "this line" : "whole poem";
   scoreScopeEl.classList.toggle("on", narrowed);
   if (performing) return; // performance mode owns the title
-  const at = playingLines.findIndex((line) => line.id === poem.selectedId);
-  scoreTitleEl.textContent =
-    narrowed && at >= 0 ? `notation · line ${at + 1}` : "notation · the score";
+  scoreTitleEl.textContent = narrowed
+    ? `notation · line ${readingSegment() + 1}`
+    : "notation · the score";
 }
 
 /**
@@ -607,6 +617,9 @@ renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
 
   if (segmentIndex !== shownSegment) {
     shownSegment = segmentIndex;
+    // A narrowed register is reading the line that just ended. Re-read the new one — this
+    // fires once per line boundary, not per frame.
+    if (scoreScope === "line") buildScore();
     const line = playingLines[segmentIndex];
     // The room reads the sentence the body is answering right now, not the whole poem.
     if (line) perfPhraseEl.textContent = `“${line.text}”`;
