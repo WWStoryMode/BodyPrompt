@@ -263,6 +263,32 @@ export class StickFigureRenderer {
     }
   }
 
+  /**
+   * Take the body off the stage.
+   *
+   * Only ever used when the session itself is replaced — New, or an imported poem whose
+   * lines have not been generated yet. Leaving the previous poem's figure standing under
+   * the new poem's hint would be the stage telling a story about a body that is not there,
+   * which is the one thing this instrument may not do.
+   */
+  clear(): void {
+    this.playing = false;
+    for (const m of this.jointMeshes) this.scene.remove(m);
+    this.jointMeshes = [];
+    for (const ghosts of this.trailMeshes.values()) {
+      for (const g of ghosts) this.scene.remove(g);
+    }
+    this.trailMeshes.clear();
+    if (this.boneLines) this.scene.remove(this.boneLines);
+    this.boneLines = undefined;
+    this.bonePositions = undefined;
+    this.loadGhosts([]); // disposes their geometry and materials too
+    this.motion = undefined;
+    this.timeline = [];
+    this.totalFrames = 0;
+    this.frameFloat = 0;
+  }
+
   play(): void {
     if (!this.motion) return;
     this.playing = true;

@@ -12,8 +12,9 @@ Two generators live here:
   another is still a fixture, without either knowing about the other.
 
 The routing table is configuration, not code (see `make_generator`). Where a model lives is
-`providers.py`'s question; this file only decides which provider a request goes to, and
-throttles per provider so that three simultaneous requests do not exhaust one local GPU.
+`providers.py`'s question, and what is kept is `store.py`'s; this file only decides which
+provider a request goes to, throttles per provider so that three simultaneous requests do
+not exhaust one local GPU, and asks the store first when the request names a seed.
 
 See docs/motion-schema.md for the format every generator must emit.
 """
@@ -34,7 +35,9 @@ from .providers import (
     GenerationRequest,
     ModelProvider,
     WorkerProvider,
+    utc_now,
 )
+from .store import MotionStore, key_for, make_store, mark_fresh, mark_served
 
 # The models the instrument names. A model not listed here can still be configured, but
 # these three are always present in /health so the dropdown can say what each one is.
@@ -242,6 +245,7 @@ class StubGenerator(Generator):
             "source": "fixture",
             "backend": self.name,
             "model_version": "bodyprompt-fixtures/v0",
+            "generated_at": utc_now(),
             "inference_ms": 0,
             "post_processing": None,
             "denoising_steps": None,
@@ -294,6 +298,7 @@ class StubGenerator(Generator):
             "source": "fixture",
             "backend": self.name,
             "model_version": "bodyprompt-fixtures/v0",
+            "generated_at": utc_now(),
             "inference_ms": 0,
             "post_processing": None,  # nothing ran, so there was nothing to clean up
             "denoising_steps": None,  # a fixture has no noise schedule to walk
@@ -321,11 +326,17 @@ class RouterGenerator(Generator):
 
     name = "router"
 
-    def __init__(self, providers: dict[str, ModelProvider]) -> None:
+    def __init__(
+        self, providers: dict[str, ModelProvider], store: MotionStore | None = None
+    ) -> None:
         self._providers = providers
         self._gates = {
             model: Gate(provider.concurrency) for model, provider in providers.items()
         }
+        # Remembering is deliberately not a provider's job. A stored motion has to outlive
+        # the model that made it — that is the whole point of keeping it — so the store sits
+        # in front of every provider rather than inside any one of them.
+        self.store = store if store is not None else MotionStore(None)
 
     @property
     def ml(self) -> bool:
@@ -380,8 +391,22 @@ class RouterGenerator(Generator):
             lines=lines,
             transition_frames=transition_frames,
         )
+        # A request that names no seed is a request for a NEW ROLL, so the store must not
+        # answer it — otherwise pressing Draft twice on an unchanged line would silently
+        # return the same motion and the ghost-cloud's whole premise would be false. An
+        # unseeded generation is still *recorded*; it just is not served.
+        key = key_for(spec)
+        if seed is not None:
+            remembered = self.store.get(key)
+            if remembered is not None:
+                # No gate. Replaying costs a disk read, not a GPU, which is exactly the
+                # separation this stage exists to make: remembering is not hosting.
+                return mark_served(remembered)
+
         with self._gates[model]:
-            return provider.generate(spec)
+            motion = mark_fresh(provider.generate(spec))
+        self.store.put(key, motion, spec)
+        return motion
 
 
 class UnknownModel(ValueError):
@@ -457,4 +482,6 @@ def make_generator() -> Generator:
         and not key.endswith(("_TOKEN", "_HOSTING", "_CONCURRENCY"))
     }
     models = sorted(set(KNOWN_MODELS) | configured)
-    return RouterGenerator({model: _provider_for(model, stub) for model in models})
+    return RouterGenerator(
+        {model: _provider_for(model, stub) for model in models}, store=make_store()
+    )

@@ -45,6 +45,13 @@ export interface PoemLine {
   history: CanonicalMotion[];
 }
 
+/** A poem as plain data — what a session file carries, and what a restore reads. */
+export interface PoemSnapshot {
+  lines: PoemLine[];
+  selectedId: number | null;
+  baked: CanonicalMotion | null;
+}
+
 const MIN_SECONDS = 2;
 const MAX_SECONDS = 10;
 /** Roughly a beat per word — slow enough that a phrase has time to be a phrase. */
@@ -234,5 +241,64 @@ export class Poem {
       prompt: line.text.trim(),
       duration_seconds: this.durationOf(line),
     }));
+  }
+
+  /**
+   * The whole poem as plain data — every line, every line's history, and the bake.
+   *
+   * Nothing is dropped and nothing is summarised: a snapshot has to be able to *become*
+   * this poem again, on another machine, with the service switched off. That is what makes
+   * a session file the writer's own copy rather than a pointer at ours.
+   */
+  toSnapshot(): PoemSnapshot {
+    return {
+      lines: this.lines.map((line) => ({
+        id: line.id,
+        text: line.text,
+        durationSeconds: line.durationSeconds,
+        state: line.state,
+        motion: line.motion,
+        history: [...line.history],
+      })),
+      selectedId: this.selectedId,
+      baked: this.bakedMotion,
+    };
+  }
+
+  /**
+   * Rebuild a poem from a snapshot.
+   *
+   * Two things are deliberately not restored verbatim:
+   *
+   * - **`generating`** becomes `stale` (or `empty`). It described a request that was in
+   *   flight when the snapshot was taken; nothing is in flight now, and a row that spins
+   *   forever would be a lie told by a dot.
+   * - **`nextId`** resumes past the highest id in the file, so a line added after a restore
+   *   cannot collide with one that was already there.
+   *
+   * Everything else — including which lines were baked — is restored exactly as recorded.
+   * `bakeIsCurrent` recomputes from the restored states, so an imported poem cannot claim
+   * a continuous reading it did not have.
+   */
+  static fromSnapshot(snapshot: PoemSnapshot): Poem {
+    const poem = new Poem([]);
+    poem.lines = snapshot.lines.map((line) => ({
+      id: line.id,
+      text: line.text,
+      durationSeconds: line.durationSeconds,
+      state: line.state === "generating" ? (line.motion ? "stale" : "empty") : line.state,
+      motion: line.motion,
+      history: [...(line.history ?? [])],
+    }));
+    // The editor always needs somewhere to type.
+    if (!poem.lines.length) poem.append("");
+    poem.nextId = Math.max(0, ...poem.lines.map((line) => line.id)) + 1;
+    poem.bakedMotion = snapshot.baked;
+    const selected = snapshot.selectedId;
+    poem.selectedId =
+      selected !== null && poem.lines.some((line) => line.id === selected)
+        ? selected
+        : poem.lines[0].id;
+    return poem;
   }
 }

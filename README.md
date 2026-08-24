@@ -173,7 +173,7 @@ in front of an audience:
 | **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
-| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; Language of Motion still a fixture |
+| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; the poem is kept; Language of Motion still a fixture |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
@@ -205,11 +205,13 @@ quietly half-built.
 
 **From v2 — the poem's unfinished edges:**
 
-- **Persistence.** Nothing is saved: a reload destroys the poem, every line's history with
-  it. The instrument is deliberately session-shaped for now, and *where a search should live*
-  is the actual question — a file the writer owns and can put beside their notes, the
-  browser, or the service. Each answer says something different about whose the search is.
-  This is the largest gap and the one most likely to be felt first.
+- ~~**Persistence.**~~ **Answered in v3 (2026-08-24.)** The question was never "add saving",
+  it was *where should a search live* — and the answer taken is **with the researcher**. The
+  browser keeps a copy so a reload stops destroying the poem, and an exported **session
+  file** is self-contained: every line, every line's history, the bake, and the motions
+  themselves, opening on another machine with nothing running. Separately, the service
+  remembers each generation, so a seeded request replays **with its model's worker stopped**.
+  See [`docs/session-schema.md`](docs/session-schema.md).
 - **The ghost-cloud on a baked poem.** Variance is currently a per-line instrument: switch it
   on and drafting one line gives four readings of that line. A bake carries no cloud, because
   four readings of a five-line poem is minutes of generation, and because the model cannot
@@ -440,6 +442,9 @@ keeping its native way of authoring) and **performance mode** (the projectable s
 - **Language of Motion remains a fixture.** SnapMoGen became real in v3 (2026-08-24), so the
   triptych now compares **two real models and one stand-in** — better than it was, and still
   not a three-model comparison.
+- **A motion served from the store is the same generation, not a fast one.** Its telemetry
+  reads `memory · remembered · not regenerated`, and the seconds beside it are the original
+  run's — never refreshed into a claim about how quick the model is.
 - **Both real models move far less for a poetic prompt than a literal one.** "a body
   remembers a place it cannot return to" gets a 0.03 m wrist span from SnapMoGen and 0.18 m
   from Kimodo; "A person walks forward and turns around" gets 3.95 m and 2.38 m. SnapMoGen is

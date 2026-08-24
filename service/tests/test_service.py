@@ -1,3 +1,6 @@
+import json
+import os
+import time
 from copy import deepcopy
 
 import httpx
@@ -7,6 +10,7 @@ from fastapi import HTTPException
 from app import main
 from app.generators import StubGenerator
 from app.providers import GenerationRequest, WorkerProvider
+from app.store import MotionStore, key_for
 from app.validation import validate_motion
 
 
@@ -211,10 +215,7 @@ def test_provenance_says_whether_the_model_really_stitched_the_poem():
 # Where a model lives, which model a request goes to, and whether that model is real used
 # to be one class with the answers written into it. These pin the seams.
 
-import json as _json
-import os
 import threading
-import time as _time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from app.generators import KNOWN_MODELS, RouterGenerator, UnknownModel, make_generator
@@ -226,6 +227,9 @@ def build(monkeypatch, **env) -> RouterGenerator:
     for key in list(os.environ):
         if key.startswith("BODYPROMPT_"):
             monkeypatch.delenv(key, raising=False)
+    # Remembering is on by default, and these tests are about routing. A test that wants a
+    # store passes one in; nothing here should write motions into the repository.
+    monkeypatch.setenv("BODYPROMPT_STORE_DIR", "off")
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     return make_generator()
@@ -318,7 +322,7 @@ class _FakeWorker(BaseHTTPRequestHandler):
     seen: dict = {}
 
     def _reply(self, body: dict) -> None:
-        payload = _json.dumps(body).encode()
+        payload = json.dumps(body).encode()
         self.send_response(200)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(payload)))
@@ -331,7 +335,7 @@ class _FakeWorker(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         length = int(self.headers.get("content-length", 0))
         _FakeWorker.seen = {
-            "payload": _json.loads(self.rfile.read(length)),
+            "payload": json.loads(self.rfile.read(length)),
             "authorization": self.headers.get("authorization"),
         }
         self._reply(StubGenerator().generate("kimodo", "move"))
@@ -397,7 +401,7 @@ def test_a_local_provider_runs_one_generation_at_a_time():
             with lock:
                 live += 1
                 peak = max(peak, live)
-            _time.sleep(0.05)
+            time.sleep(0.05)
             with lock:
                 live -= 1
             return StubGenerator().generate("kimodo", "move")
@@ -439,3 +443,212 @@ def test_the_router_chooses_a_seed_so_the_motion_can_name_it():
 
     assert isinstance(seen[0], int)  # decided here, not left to the worker
     assert seen[1] == 7              # an explicit seed is never overridden
+
+
+# ---------------------------------------------------------------------------
+# Remembering — v3 Stage C.
+#
+# The rule these pin: a stored motion is THE SAME GENERATION, served again. The store may
+# save the GPU time; it may never redescribe the motion as having been cheaper than it was.
+# ---------------------------------------------------------------------------
+
+
+class _Provider:
+    """A provider that counts its calls, and can be made to fail like a worker that is down."""
+
+    model = source = "kimodo"
+    hosting = "local"
+    concurrency = 1
+
+    def __init__(self, *, fails: bool = False) -> None:
+        self.calls = 0
+        self.fails = fails
+
+    def ready(self) -> bool:
+        return not self.fails
+
+    def describe(self) -> dict:
+        return {"model": self.model, "source": self.source, "ready": self.ready()}
+
+    def generate(self, req: GenerationRequest) -> dict:
+        self.calls += 1
+        if self.fails:
+            raise RuntimeError("kimodo worker unavailable at http://worker.test:8010")
+        motion = StubGenerator().generate("kimodo", req.prompt or "move")
+        motion["seed"] = req.seed
+        # What a real worker reports: a duration, and the moment it happened.
+        motion["provenance"]["source"] = "kimodo"
+        motion["provenance"]["inference_ms"] = 41_000
+        return motion
+
+
+def _router(tmp_path, provider=None, **store_kwargs):
+    provider = provider or _Provider()
+    router = RouterGenerator(
+        {"kimodo": provider}, store=MotionStore(tmp_path, **store_kwargs)
+    )
+    return router, provider
+
+
+def test_a_seeded_request_is_answered_from_the_store_the_second_time(tmp_path):
+    router, provider = _router(tmp_path)
+
+    first = router.generate("kimodo", "a body remembers", seed=7)
+    second = router.generate("kimodo", "a body remembers", seed=7)
+
+    assert provider.calls == 1  # the model ran once
+    assert second["frames"] == first["frames"]
+    assert second["provenance"]["served_from_store"] is True
+    assert first["provenance"]["served_from_store"] is False
+
+
+def test_serving_from_the_store_never_redescribes_how_long_the_model_took(tmp_path):
+    """The lie this forbids is the flattering one: a replay reading as a fast generation."""
+    router, _ = _router(tmp_path)
+
+    first = router.generate("kimodo", "move", seed=7)
+    second = router.generate("kimodo", "move", seed=7)
+
+    assert second["provenance"]["inference_ms"] == first["provenance"]["inference_ms"]
+    assert second["provenance"]["generated_at"] == first["provenance"]["generated_at"]
+    # The one thing that IS new: when this copy was handed over.
+    assert second["provenance"]["served_at"] >= second["provenance"]["generated_at"]
+    assert "served_at" not in first["provenance"]
+
+
+def test_a_motion_replays_with_the_worker_down(tmp_path):
+    """Remembering is not hosting. This is the whole point of the stage, in one test."""
+    store = MotionStore(tmp_path)
+    live = RouterGenerator({"kimodo": _Provider()}, store=store)
+    live.generate("kimodo", "a body remembers a place", seed=7)
+
+    dead_worker = _Provider(fails=True)
+    later = RouterGenerator({"kimodo": dead_worker}, store=MotionStore(tmp_path))
+
+    replayed = later.generate("kimodo", "a body remembers a place", seed=7)
+
+    assert replayed["provenance"]["served_from_store"] is True
+    assert dead_worker.calls == 0
+    assert validate_motion(replayed) is replayed
+    # And the worker really is down — anything not remembered still fails honestly.
+    with pytest.raises(RuntimeError):
+        later.generate("kimodo", "something never generated", seed=7)
+
+
+def test_an_unseeded_request_is_recorded_but_never_served(tmp_path):
+    """No seed means "roll again". A store that answered it would falsify the ghost-cloud."""
+    router, provider = _router(tmp_path)
+
+    router.generate("kimodo", "move", seed=None)
+    router.generate("kimodo", "move", seed=None)
+
+    assert provider.calls == 2
+    assert router.store.stats()["entries"] == 2  # both kept, neither served
+
+
+def test_the_key_splits_on_everything_that_decides_the_motion():
+    base = GenerationRequest(model="kimodo", prompt="move", seed=7)
+    variations = [
+        GenerationRequest(model="snapmogen", prompt="move", seed=7),
+        GenerationRequest(model="kimodo", prompt="move slowly", seed=7),
+        GenerationRequest(model="kimodo", prompt="move", seed=8),
+        GenerationRequest(model="kimodo", prompt="move", seed=7, variants=4),
+        GenerationRequest(model="kimodo", prompt="move", seed=7, duration_seconds=7.0),
+        GenerationRequest(model="kimodo", prompt="move", seed=7, denoising_steps=75),
+        GenerationRequest(model="kimodo", prompt="move", seed=7, post_processing=False),
+    ]
+
+    keys = {key_for(base)} | {key_for(request) for request in variations}
+    assert len(keys) == len(variations) + 1
+
+
+def test_the_key_ignores_a_control_the_request_could_not_have_used():
+    """`transition_frames` means nothing to a single prompt; splitting on it would mean two
+    identical requests missing each other over a number neither of them used."""
+    a = GenerationRequest(model="kimodo", prompt="move", seed=7, transition_frames=5)
+    b = GenerationRequest(model="kimodo", prompt="move", seed=7, transition_frames=20)
+    assert key_for(a) == key_for(b)
+
+    lines = [{"prompt": "one", "duration_seconds": 3.0}]
+    poem_a = GenerationRequest(model="kimodo", lines=lines, seed=7, duration_seconds=5.0)
+    poem_b = GenerationRequest(model="kimodo", lines=lines, seed=7, duration_seconds=9.0)
+    assert key_for(poem_a) == key_for(poem_b)  # a poem's lines carry their own durations
+    # …but the transition between its lines is real, and does split.
+    poem_c = GenerationRequest(model="kimodo", lines=lines, seed=7, transition_frames=20)
+    assert key_for(poem_a) != key_for(poem_c)
+
+
+def test_a_poem_is_remembered_by_its_lines(tmp_path):
+    router, provider = _router(tmp_path)
+    lines = [
+        {"prompt": "a body remembers", "duration_seconds": 3.0},
+        {"prompt": "a place it cannot return to", "duration_seconds": 5.0},
+    ]
+
+    router.generate("kimodo", None, lines=lines, seed=7)
+    router.generate("kimodo", None, lines=deepcopy(lines), seed=7)
+    edited = deepcopy(lines)
+    edited[1]["prompt"] = "a place it returns to"
+    router.generate("kimodo", None, lines=edited, seed=7)
+
+    assert provider.calls == 2  # the identical poem was remembered; the edited one was not
+    assert router.store.entries()[0]["lines"] == 2
+
+
+def test_the_store_outlives_the_process(tmp_path):
+    """A reload destroying a forty-second generation is the failure this stage exists for."""
+    MotionStore(tmp_path).put(
+        "abc", {"frames": [], "seed": 7}, GenerationRequest(model="kimodo", prompt="move")
+    )
+    assert MotionStore(tmp_path).get("abc") == {"frames": [], "seed": 7}
+
+
+def test_eviction_drops_what_has_not_been_used(tmp_path):
+    store = MotionStore(tmp_path, limit=2)
+    request = GenerationRequest(model="kimodo", prompt="move")
+    for key in ("aaa", "bbb"):
+        store.put(key, {"frames": [], "seed": 1}, request)
+    # Age them explicitly rather than trusting two writes to land a filesystem tick apart.
+    for key, age in (("aaa", 200), ("bbb", 100)):
+        path = tmp_path / f"{key}.json"
+        os.utime(path, (time.time() - age, time.time() - age))
+
+    store.get("aaa")  # replaying "aaa" is what makes it worth keeping
+    store.put("ccc", {"frames": [], "seed": 1}, request)
+
+    assert store.get("aaa") is not None
+    assert store.get("ccc") is not None
+    assert store.get("bbb") is None
+    assert not (tmp_path / "bbb.meta.json").exists()  # the metadata goes with it
+
+
+def test_a_store_that_cannot_be_written_disables_itself(tmp_path):
+    """Remembering is a convenience. Losing it must never take generation down with it."""
+    blocked = tmp_path / "not-a-directory"
+    blocked.write_text("")
+
+    store = MotionStore(blocked / "motions")
+
+    assert store.enabled is False
+    assert store.error is not None
+    assert store.stats() == {"enabled": False, "error": store.error}
+
+    router = RouterGenerator({"kimodo": _Provider()}, store=store)
+    motion = router.generate("kimodo", "move", seed=7)
+    assert validate_motion(motion) is motion
+    assert motion["provenance"]["served_from_store"] is False
+
+
+def test_the_listing_says_what_is_remembered_without_returning_it(tmp_path):
+    router, _ = _router(tmp_path)
+    router.generate("kimodo", "a body remembers", seed=7)
+
+    entry = router.store.entries()[0]
+
+    assert entry["model"] == "kimodo"
+    assert entry["prompt"] == "a body remembers"
+    assert entry["seed"] == 7
+    assert entry["frames"] > 0
+    assert "frames" not in entry or isinstance(entry["frames"], int)
+    assert entry["generated_at"]
+    assert "positions" not in json.dumps(entry)  # metadata only, never the motion

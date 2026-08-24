@@ -340,3 +340,95 @@ the three panels were the same fixture wearing seeded noise.
 
 Still owed on this worker: the GlobalRegressor pass, and whether sub-128-frame requests
 should be refused rather than silently lengthened.
+
+---
+
+### 2026-08-24 — Stage C, remembering
+
+Hosting and routing came apart in Stage A. This stage takes out the third thing that was
+fused with them: **what is kept**.
+
+Until today the instrument kept nothing. A motion existed for as long as the tab that asked
+for it, and a generation that took Kimodo forty seconds on a GPU was gone the moment someone
+reloaded. That made remembering a property of hosting — you could only ever see a Kimodo
+motion while the Kimodo worker was up. Two things now hold it, and they answer different
+questions.
+
+#### The motion store — the service remembers a generation
+
+`service/app/store.py`. A motion is written to disk under a key derived from everything that
+decided it: model, prompt or lines, seed, variants, duration, denoising steps,
+post-processing, transition frames. Plain JSON in a directory, deliberately — a researcher
+can `ls` what the instrument remembers, copy one out, or delete one, without this repository
+being involved.
+
+Two things are **not** in the key, and both are deliberate. `duration_seconds` is nulled for a
+poem, whose lines carry their own; `transition_frames` is nulled for a single prompt, which
+has nothing to transition into. Letting an irrelevant control split the key would mean two
+identical requests missing each other over a number neither of them used.
+
+**A request with no seed is never served from the store.** It is a request for a new roll, and
+a store that answered it would make the ghost-cloud — which is entirely a claim about seeds —
+false. Unseeded generations are still recorded; they are just not replayed.
+
+#### The honesty rule, and the lie it forbids
+
+A stored motion is **the same generation, served again**. The flattering lie available here is
+specific: a replay reading as a fast model. So `generated_at` and `inference_ms` are the
+original run's and are never refreshed, `served_from_store` becomes `true`, and `served_at` is
+added so the two moments cannot collapse into one. The stage says `memory · remembered · not
+regenerated` beside the seconds, so a screenshot cannot make a disk read look like inference.
+
+`provenance.generated_at` is new in this stage, on every path including the fixtures. Without
+it a replay had no original moment to preserve.
+
+#### Measured, with the worker stopped
+
+The verification the plan asked for, run against the real SnapMoGen worker:
+
+| | result |
+|---|---|
+| First generation, `seed: 7` | 152 frames, `source: snapmogen`, **1451 ms**, `served_from_store: false` |
+| Same request again | identical frames, still **1451 ms**, `served_from_store: true`, `served_at` added |
+| `docker compose stop snapmogen-worker`, then the same request | **replayed**, still 1451 ms and the original `generated_at` |
+| A prompt never generated, worker still stopped | fails honestly: `snapmogen worker unavailable at http://snapmogen-worker:8011` |
+| `docker compose restart service`, then the same request | still replayed — the store is a named volume, not a process |
+
+One motion is **262 KB** on disk. The default limit is 500 of them, evicted
+least-recently-used; replaying an entry is what makes it worth keeping. Eviction is safe
+because a session file carries its own motions, which is the other half of this stage.
+
+#### The session — the writer owns the search
+
+The parked note asked *where a search should live*, and answered nothing, because each answer
+says something different about whose it is. v3 answers: **the researcher's**. Two layers,
+documented in [`session-schema.md`](session-schema.md):
+
+- **Autosave to the browser**, IndexedDB rather than `localStorage`. Not a preference: one
+  five-second motion is a few hundred KB, a poem keeps every line's history, and
+  `localStorage` fails by *throwing on write* at ~5 MB — so the poem would autosave happily
+  for the first few generations and then silently stop, which is worse than never saving.
+- **A session file**, self-contained: every line, every line's history, the bake, and the
+  motions themselves. It opens on another machine with nothing running. A pointer into
+  someone else's store would not be a copy of anyone's work.
+
+A restore is allowed to change almost nothing. The exceptions exist to stop the restored poem
+claiming something untrue: a line caught mid-generation cannot come back spinning forever, and
+ids are reseated so a new line cannot collide with a restored one. Whether a bake *is still
+the poem* is recomputed from the restored states, so an imported session cannot claim a
+continuous reading it did not have.
+
+Two smaller things fell out of it and are worth naming. `StickFigureRenderer.clear()` is new:
+replacing the session with one that has nothing generated used to leave the previous poem's
+body standing on the stage under the new poem's hint — a body belonging to a sentence nobody
+could see. And `renderPoem()` is now the single funnel autosave hangs off, because it is the
+one place every mutation of the poem already passes through.
+
+#### What this stage does not do
+
+The instrument does not yet **ask** for a stored motion. Nothing in the UI sends a seed, so
+in ordinary use every generation is a fresh roll and the store only ever records. The store is
+reachable from the API — `GET /motions` lists what is kept, and re-issuing a request with its
+seed replays it — and wiring a UI affordance onto that belongs with the triptych in Stage D,
+where showing a stored panel beside a live one is the thing that needs it. Saying so here is
+cheaper than a screen that implies a feature nobody can reach.
