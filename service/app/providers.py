@@ -261,6 +261,10 @@ class WorkerProvider:
             # not a glitch.
             "frames_asked": motion.pop("frames_asked", None),
             "frames_used": motion.pop("frames_used", None),
+            # Which of a model's body parts actually ran. Language of Motion decomposes into
+            # face/hands/upper/lower and its text checkpoint drives only two of the four, so
+            # a motion has to be able to say which joints nothing generated.
+            "parts_generated": motion.pop("parts_generated", None),
         }
         return motion
 

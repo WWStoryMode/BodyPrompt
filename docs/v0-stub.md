@@ -149,22 +149,28 @@ building the instrument first was worth doing:
 ## Retiring the fakes
 
 The v1 Kimodo backend retired the prompt hash, synthetic variance and empty rotations **for
-outputs whose provenance says `source: kimodo`**. As of **v3 Stage B (2026-08-24)**,
-`source: snapmogen` does the same: SnapMoGen reads the prompt, samples its own variance, and
-returns real rotations.
+outputs whose provenance says `source: kimodo`**. **v3 Stage B (2026-08-24)** did the same
+for `source: snapmogen`, and **Stage E (2026-08-24)** for `source: language-of-motion`.
 
-**Fake #2 is therefore two-thirds retired.** The hash collision described above — the one
-that made the SnapMoGen and Kimodo panels identical row for row — no longer applies to
-either of them; only Language of Motion still selects a fixture by hashing. So the triptych
-now compares **two real models and one stand-in**, and its banner has to say exactly that
-rather than "the models are not real". A screenshot of it is still not a three-model
-comparison.
+**Fake #2 is retired.** The hash collision described above — the one that made the SnapMoGen
+and Kimodo panels identical row for row — applies to none of the three any more. The
+triptych compares three real models, which is what it claimed to do from v0 and could not do
+until today.
+
+Two qualifications remain, and the triptych states both on screen rather than here:
+
+- In **fixture mode** (no worker configured) every panel is still a hash of the prompt, and
+  everything in this document applies in full.
+- Language of Motion returns real motion but **barely travels** — see the Stage E log in
+  [`v3-models.md`](v3-models.md). That is an observation about the model, not a fixture
+  artefact, and the difference matters: a fixture is a thing we made up, while this is a
+  measurement.
 
 | Fake | Retired by | State |
 |---|---|---|
-| #1 the prompt hash | the model reading the prompt | ✓ for kimodo and snapmogen |
-| #2 the triptych's model signature | three actual models | ◐ two of three real |
-| #3 the ghost-cloud perturbation | asking the model for *n* samples | ✓ for kimodo and snapmogen |
+| #1 the prompt hash | the model reading the prompt | ✓ for all three |
+| #2 the triptych's model signature | three actual models | ✓ as of Stage E |
+| #3 the ghost-cloud perturbation | asking the model for *n* samples | ✓ for all three |
 
 ### What is real about SnapMoGen, and what to be careful of
 

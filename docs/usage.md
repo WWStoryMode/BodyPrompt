@@ -268,8 +268,9 @@ part of the research. (Only *write* is wired up; the others are labelled, not bu
 panel has its own accent colour, and all three play in step.
 
 The banner at the top is **built from `/health`**, not written into the page, so it always
-says how many of the three panels are actually model output. As of v3 that is two of three —
-Language of Motion is still a hand-authored fixture and its panel says so.
+says how many of the three panels are actually model output. As of v3 Stage E all three can
+be real — each one is, when its own worker is configured and up. With no workers configured
+every panel is a fixture again, and the banner says that too.
 
 ### One line, or the whole poem — <kbd>N</kbd>
 
@@ -366,8 +367,16 @@ the three can differ:
 ```bash
 BODYPROMPT_MODEL_KIMODO=http://kimodo-worker:8010          # a worker on this machine
 BODYPROMPT_MODEL_SNAPMOGEN=https://gpu.example.com/snap    # a worker somewhere else
-BODYPROMPT_MODEL_LANGUAGE_OF_MOTION=fixture                # not real yet
+BODYPROMPT_MODEL_LANGUAGE_OF_MOTION=http://lom-worker:8012 # another local worker
 ```
+
+Language of Motion additionally needs the **SMPL-X body model**, which sits behind a
+registration at <https://smpl-x.is.tue.mpg.de/> that a human has to pass. It is not optional
+and not only for rendering: the model emits pose *parameters*, and turning those into the
+joint positions our schema carries means running the body model. Point `LOM_SMPLX_HOST` at
+the directory containing `smplx/SMPLX_NEUTRAL_2020.npz`; the worker's `/health` names
+whatever is missing rather than failing from inside `smplx`. See
+[`inference/language-of-motion-worker/checkpoints/README.md`](../inference/language-of-motion-worker/checkpoints/README.md).
 
 A **URL is a worker**, and that is the only thing that distinguishes a container on this
 laptop from a GPU in another building. Local and remote are the same code path, because the

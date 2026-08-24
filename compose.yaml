@@ -89,6 +89,32 @@ services:
               count: 1
               capabilities: [gpu]
 
+  # Real as of v3 Stage E. The cheapest of the three: ~3 GB RSS and 0.9 GB VRAM, against
+  # SnapMoGen's 2/0.6 and Kimodo's 16-17.8. Needs its checkpoints AND the MPI-gated SMPL-X
+  # body model mounted — see the README in its checkpoints/ directory — and reports
+  # ready:false naming exactly what is absent.
+  lom-worker:
+    profiles: ["local-gpu", "lom"]
+    build:
+      context: ./inference
+      dockerfile: language-of-motion-worker/Dockerfile
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./inference/language-of-motion-worker/checkpoints:/checkpoints:ro
+      # SMPL-X lives outside the repo: it is licensed separately, behind a registration,
+      # and is not this repository's to redistribute. Point LOM_SMPLX_HOST at the directory
+      # CONTAINING smplx/SMPLX_NEUTRAL_2020.npz.
+      - ${LOM_SMPLX_HOST:-./inference/language-of-motion-worker/checkpoints/smplx_models}:/smplx:ro
+      - huggingface-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 volumes:
   huggingface-cache:
   embedding-cache:

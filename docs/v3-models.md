@@ -567,3 +567,112 @@ Both keys now route through one path, `B` in the triptych means the whole poem, 
 bar buttons relabel to **Ask all three** / **Whole poem** so the instruction on screen names
 a control that exists. A triptych generation also takes the busy guard the bench has always
 had: three models on one line only wasted seconds, but a whole poem is minutes.
+
+---
+
+### 2026-08-24 — Stage E, Language of Motion
+
+The third model. v3's premise was that the triptych has never compared models; as of this
+stage it does.
+
+#### What the spike answered, and one thing it got wrong first
+
+Everything the plan asked, in order:
+
+| question | answer |
+|---|---|
+| Runs on torch ≥2.7 / cu128 / sm_120? | **Yes.** Upstream already ships an RTX 5090 path; our stable 2.9.1+cu128 beats their nightly. |
+| Joint names, enumerated not guessed? | **Identity.** SMPL-X's first 22 joints match `smpl-22` name-for-name, order-for-order. |
+| Needs dataset mean/std? | **No.** There is no denormalisation anywhere in the path. |
+| Deterministic seed? Multiple samples? | **Both.** The ghost-cloud is available. |
+| Footprint and latency? | **2.97 GB RSS, 0.93 GB VRAM, ~8.5 s.** The cheapest of the three. |
+
+**One conclusion in this log was wrong before it was right, and the correction is the point.**
+The VQ decoder returns values around 1e7 where 6D rotations should sit near [-1, 1]. That was
+measured correctly and reasoned about badly: it was called a blocking defect. It is not. The
+consumer of those features is `rotation_6d_to_matrix`, which is Gram-Schmidt — it normalises
+both basis vectors, so a uniform positive scale cancels exactly. Checked rather than assumed:
+`max |R·Rᵀ − I| = 3.58e-07`, `det = 1.000000` throughout, no NaN. The lesson is small and
+general: **judge a value by what consumes it, not against an expectation of what it should
+look like.**
+
+#### The upstream parser cannot read the released checkpoint
+
+This one is real. `motion_string_to_compositional_token` looks for a `<motion_id_0>` wrapper;
+when `content.index()` raises, its helper returns a **sentinel string** that the caller then
+matches, sending it down a second path looking for per-part `<upper_id_256>` delimiters. The
+released text-to-motion checkpoint emits neither. Both lookups miss and the result is **one
+token of value 0 per part** — a four-frame motionless body that raises nothing.
+
+Measured: the model produced 311 upper and 200 lower tokens; upstream's parser returned `[0]`
+for every part, for every seed. It made the model look deterministic *and* frozen. It is
+neither. `app/tokens.py` reads the stream directly, which is what upstream's own fallback
+branch intends once it has an inner string.
+
+#### The reduction, quantified
+
+SMPL-X is 55 joints; the canonical skeleton is 22. This boundary **discards 33 of 55 — 60% of
+the model's articulation** — from the one model in the triptych whose design premise is
+decomposing the body into face, hands, upper and lower.
+
+Mostly theoretical, as it turns out: the released text-to-motion checkpoint emits **no face
+and no hand tokens at all**. Those joints are explicitly zeroed — a neutral face, open hands —
+and `provenance.parts_generated` records `["upper", "lower"]` so a still face never reads as a
+choice the model made.
+
+#### Measured through the service
+
+Three prompts, 5 s requested, seed 7:
+
+| prompt | head | floor | travel | wrist span | asked → used |
+|---|---|---|---|---|---|
+| "a person walks forward and turns around" | 1.547 m | −0.055 m | **0.09 m** | 0.46–0.63 m | 150 → 800 |
+| "A person raises both arms above their head." | 1.537 m | −0.006 m | 0.22 m | 0.32–0.76 m | 150 → 868 |
+| "a body remembers a place it cannot return to" | 1.508 m | −0.066 m | 0.06 m | 0.46–0.65 m | 150 → 976 |
+
+Head height passes on every prompt — the check that caught SnapMoGen's 0.85 m error. SMPL-X
+is metric natively, so unlike SnapMoGen there was no rig scale to discover.
+
+**Bone rigidity again proves nothing.** SMPL-X does forward kinematics over a template, so
+bones are rigid whatever the joint map says. `tests/test_adapter.py` asserts that weakness
+explicitly, so nobody adds a rigidity check later and believes it validated something.
+
+#### It barely travels, and that is a finding
+
+"A person walks forward and turns around" moves the pelvis **0.09 m**. On the same prompt
+Kimodo travels 2.11 m and SnapMoGen 3.89 m. Root translation here comes from a global VQ
+integrating a velocity, and upstream's own TODO list still has **"Text-to-motion Result on
+rotation format" unchecked**, which is consistent with the released text path not carrying
+proper root motion.
+
+Recorded as an observation, not a defect claim: three prompts and one scalar. It is owed work
+in the same sense SnapMoGen's GlobalRegressor is owed, and it is exactly the kind of thing the
+triptych now exists to make visible.
+
+#### Length is a request, not a contract
+
+The model generates until it stops — 800 to 976 frames, 27 to 33 s — with no length
+conditioning available on this checkpoint. The worker truncates to what was asked and records
+both numbers, so Stage D's panel says `asked 150 frames, moved 800`. A far bigger gap than
+SnapMoGen's floor, and now impossible to miss.
+
+#### What the worker does not carry
+
+Upstream's `requirements.txt` asks for `fairseq` (only `demo.py` and the data-prep scripts
+import it), `chumpy` (only for legacy `.pkl` body models — ours is `.npz`), `numpy==1.23.1`,
+`transformers==5.12.1`, and an omegaconf pin with no Python 3.10 artefact. None of it is
+needed. Two vendored details were: `velocity2position` is nine lines of arithmetic that costs
+pandas, matplotlib, librosa and opencv if imported, and the joint masks cost spacy and a
+vendored BVH parser through a package `__init__`. Both are read past rather than installed,
+and both say so where they are used.
+
+**A build note worth keeping:** the spike's Dockerfile reformatted the shared torch `RUN`
+block — same commands, different line breaks — and BuildKit missed the cache, paying ~850 s
+for a cold torch layer. The three workers' base and torch layers must stay byte-identical.
+
+#### Honesty debt cleared in the same commit
+
+`docs/v0-stub.md` retires **fake #2** — the triptych's model signature — because there is no
+longer a panel selected by hashing. All three fakes are now retired outside fixture mode. The
+README's Status section says the same, and the triptych's banner, which builds itself from
+`/health` as of Stage D, needed no editing at all.
