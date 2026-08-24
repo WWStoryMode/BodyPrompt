@@ -56,6 +56,30 @@ services:
               count: 1
               capabilities: [gpu]
 
+  # Not real yet: the adapter, the contract and the length rules are built and tested, but
+  # the checkpoints are not wired up. Left out of the local-gpu profile on purpose, so
+  # nobody starts it expecting motion. See docs/v3-models.md.
+  snapmogen-worker:
+    profiles: ["snapmogen"]
+    build:
+      context: ./inference
+      dockerfile: snapmogen-worker/Dockerfile
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      # Weights and the 5 KB of dataset statistics, mounted rather than baked — large, and
+      # under Snap Inc.'s non-commercial licence.
+      - ./inference/snapmogen-worker/checkpoints:/checkpoints:ro
+      - ./inference/snapmogen-worker/meta:/meta:ro
+      - huggingface-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
 volumes:
   huggingface-cache:
   embedding-cache:

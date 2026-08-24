@@ -1,0 +1,28 @@
+[project]
+name = "bodyprompt-snapmogen-worker"
+version = "0.1.0"
+description = "Local SnapMoGen inference and its adapter to the BodyPrompt canonical skeleton."
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "bodyprompt-motion",
+    "fastapi>=0.110",
+    "numpy>=1.26",
+    "uvicorn>=0.29",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8.2",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+# Shared with the Kimodo worker. A path dependency rather than a copy: drift in the
+# canonical core does not crash, it returns a plausible-looking body with false anatomy.
+[tool.uv.sources]
+bodyprompt-motion = { path = "../common", editable = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

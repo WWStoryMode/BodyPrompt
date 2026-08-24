@@ -136,3 +136,120 @@ Live, on the RTX 5080:
 - `BODYPROMPT_BACKEND=stub` with `BODYPROMPT_MODEL_KIMODO` set → the same real Kimodo. The
   per-model variable alone makes a model real, which is the whole claim of the stage.
 - `snapmogen` still returns `stub: true`; an unknown model returns 422.
+
+
+---
+
+### 2026-08-24 — Stage B, SnapMoGen (scaffolding; weights pending)
+
+Opened with a spike rather than a Dockerfile, as planned. The spike answered everything
+except motion quality; the weights are blocked on a Google Drive rate limit, so what is
+built here is everything that does not need them.
+
+#### The joint map, enumerated from the artefact
+
+`utils/A_Pose.bvh` **ships in SnapMoGen's repository**, so the 24-joint hierarchy did not
+need the 16.5 GB dataset. The names are Maya bind-joint style — `C_pelvis0001_bind_JNT`,
+`L_legUpper0001_bind_JNT` — a **third convention**, which the shared alias table resolves
+none of. It gets an exact map, for the reason the SOMA map is exact.
+
+**22 of 24 map cleanly.** Two are dropped: `C_neck0002` (SMPL-22 has one neck joint), and
+`ROOT`. The `ROOT` decision was the one real ambiguity — SnapMoGen's `ROOT` parents *both*
+the spine and the pelvis, where SMPL-22's pelvis parents the spine *and* the hips, so two
+answers were defensible. It dissolved on inspection: **`C_pelvis0001`'s rest offset from
+`ROOT` is exactly `[0, 0, 0]`**. They are coincident, so nothing is lost by preferring the
+pelvis, which keeps the legs' parent where the canonical edges expect it. Checked, not
+assumed.
+
+#### It runs on Blackwell — the largest risk, cleared
+
+SnapMoGen pins `torch==2.4.1` and `numpy==1.24.3`. With both pins lifted, the whole path
+runs on **torch 2.9.1+cu128 / numpy 2.2.6 / sm_120**: imports, model construction,
+`generate()`, VQ decode, forward kinematics to `(T, 24, 3)`.
+
+It needs exactly one compatibility patch, and it is three lines. `common/animation.py`
+imports `numpy.core.umath_tests` — a private *test* module removed in **numpy 1.16**, years
+before SnapMoGen's own pinned 1.24.3, so it is broken on their pins too. It is used for one
+call to `matrix_multiply`, which is `np.matmul`. The worker installs a shim into
+`sys.modules` **before importing**, rather than vendoring a patched fork: a modified copy is
+how a repository quietly stops running the model it claims to run.
+
+#### It is far cheaper than Kimodo
+
+| | SnapMoGen | Kimodo |
+|---|---|---|
+| VRAM | **0.59 GiB** | 1.7 GiB |
+| Host RSS | **2.14 GiB** | 16–17.8 GiB |
+| Text encoder | T5-base, 109.6M, **on GPU**, 0.20 s | Llama-3-8B, on CPU, 0.8 s |
+| One generation | **0.12 – 0.30 s** | ~4.6 s per variant |
+| Gated weights | **no** | yes (Llama-3-8B) |
+
+At ~2 GB RSS this worker sits resident beside Kimodo without approaching the ceiling. "Three
+models will not fit" was about Kimodo specifically, not about models in general.
+
+The ghost-cloud is nearly free: **four samples of one prompt in one batch, 0.12 s**, and the
+siblings differ. The contract differs from Kimodo's though — SnapMoGen seeds globally and
+samples stochastically, so one seed gives a reproducible *batch*, not four separately
+addressable siblings. Provenance must say that rather than borrow Kimodo's language.
+
+#### Two traps, both guarded
+
+**The decoder always returns the full grid.** Asked for 128 frames or 60, it returns
+`(1, 320, 296)` either way; SnapMoGen's own script truncates at the call site. Missed, a
+two-second line silently becomes 10.67 seconds and nothing downstream would flag it. The
+adapter's `truncate()` does it, and refuses if fewer frames came back than were asked for.
+
+**Below its minimum it degrades rather than refuses.** `min_motion_length` is 128 frames
+(4.27 s) and a poem line may be 2 s — but 60 frames generated without error. So the floor is
+enforced in the worker where it can be stated, not left to produce quietly untrustworthy
+motion. Lengths also quantise to multiples of 8, so a requested 3.0 s can never be exactly
+90 frames; `/health` publishes `min_frames`, `max_frames` and `unit_length` so a caller does
+not have to guess.
+
+#### A poem is refused, not faked
+
+SnapMoGen has no equivalent of `multi_prompt` — it cannot condition a line on the body the
+previous line left. A request carrying `lines` is rejected with a message saying why.
+Generating the lines separately and returning them as one motion is exactly the flattery
+`segments` and `provenance.multi_prompt` exist to prevent. What the triptych should do with
+a poem when only one model can stitch one is **Stage D's** question, and it is a design
+question before it is a code one.
+
+#### The shared canonical core
+
+A second worker needed everything around the joint map, so it moved to
+`inference/common/bodyprompt_motion`: the 22 joints and edges, the alias fallback, name
+resolution, matrix→quaternion, centre-and-ground, schema assembly. Each worker keeps its own
+**map**, because the map is model knowledge and it is where the mistakes are.
+
+Kimodo's behaviour is unchanged and proven both ways: 21 tests pass untouched, and the
+rebuilt image generates real motion with head at **1.567 m** and max bone-length cv
+**0.0077%** — the numbers v1 recorded.
+
+#### What the worker needs, and what it does not
+
+Inference reads **about 5 KB** of the 16.5 GB dataset: `meta_data/mean.npy` and `std.npy`
+(2,496 bytes each, shape `(296,)`), fetched straight from the HuggingFace dataset and
+committed. The only other dataset read is one BVH used purely for skeleton offsets, and the
+repo's own `A_Pose.bvh` appears to substitute — it builds a `Skeleton`, the names come out
+exactly as mapped, and forward kinematics runs. **Not yet proven** that its *proportions*
+match the training rig; bone-length rigidity against real weights is that test.
+
+There is also a **third checkpoint**: a `GlobalRegressor` (`gmr`) that post-processes global
+root translation, loaded separately from the VQ-VAE and the transformer and easy to miss.
+
+#### Status
+
+- 23 worker tests pass: the joint map against SnapMoGen's real 24-joint list, the two
+  intended drops and no others, ankle-versus-toe resolution, centimetre→metre scaling,
+  travel preserved while the start is normalised, bone rigidity through adaptation, the
+  wxyz→xyzw reorder, truncation, and the length rules.
+- The image builds and the container starts, sees CUDA, and reports `ready: false` naming
+  exactly what is missing.
+- **`snapmogen` is still routed to `fixture`.** It stays that way until the weights land and
+  the bone-rigidity check passes; flipping it is one environment variable, and it must not
+  be flipped before then.
+
+Still needed, all requiring the weights: motion quality, whether sub-128-frame output is
+usable, bone-length rigidity (the joint map's real test), head height in metres confirming
+the 0.01 scale, and real-weight latency.
