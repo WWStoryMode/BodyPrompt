@@ -1,14 +1,19 @@
 """
 Pluggable motion generators — the swappable backends behind `POST /generate`.
 
-One interface, many implementations. The API contract and the whole frontend never
-change; only the thing that *produces* the canonical motion swaps out, selected by the
-`BODYPROMPT_BACKEND` environment variable (default: "stub").
+One interface, many implementations. The API contract and the whole frontend never change;
+only the thing that *produces* the canonical motion swaps out.
 
-The default remains the no-ML `StubGenerator`. The v1 "kimodo" backend is deliberately an
-HTTP boundary: this small service stays usable without CUDA, while a local Docker worker
-owns Kimodo's large model/runtime. Pointing the same boundary at another machine later does
-not change the browser or the canonical motion contract.
+Two generators live here:
+
+- `StubGenerator` — the no-ML default. Hand-authored fixtures, chosen by a stable hash.
+- `RouterGenerator` — **per model**, sends the request to whatever hosts that model: a local
+  worker, a remote worker, or the stub. This is the piece that lets one model be real while
+  another is still a fixture, without either knowing about the other.
+
+The routing table is configuration, not code (see `make_generator`). Where a model lives is
+`providers.py`'s question; this file only decides which provider a request goes to, and
+throttles per provider so that three simultaneous requests do not exhaust one local GPU.
 
 See docs/motion-schema.md for the format every generator must emit.
 """
@@ -22,7 +27,18 @@ import pathlib
 import random
 import secrets
 import time
-from urllib import error, request
+
+from .providers import (
+    FixtureProvider,
+    Gate,
+    GenerationRequest,
+    ModelProvider,
+    WorkerProvider,
+)
+
+# The models the instrument names. A model not listed here can still be configured, but
+# these three are always present in /health so the dropdown can say what each one is.
+KNOWN_MODELS = ("kimodo", "snapmogen", "language-of-motion")
 
 # fixtures/ lives at the repo root: service/app/generators.py -> ../../fixtures
 FIXTURES_DIR = pathlib.Path(__file__).resolve().parents[2] / "fixtures"
@@ -164,7 +180,7 @@ class StubGenerator(Generator):
     def capabilities(self) -> list[dict]:
         return [
             {"model": model, "source": "fixture", "ready": self.ready()}
-            for model in ("snapmogen", "language-of-motion", "kimodo")
+            for model in KNOWN_MODELS
         ]
 
     @property
@@ -292,56 +308,49 @@ class StubGenerator(Generator):
         return motion
 
 
-class KimodoGenerator(Generator):
+class RouterGenerator(Generator):
     """
-    Hybrid v1 backend: Kimodo is real; the other named models remain honest fixtures.
+    One generator, many models — each sent wherever it actually lives.
 
-    The worker returns canonical motion rather than model-native tensors. That keeps the
-    SOMA adapter beside the model version it understands and makes this boundary equally
-    usable for a local Compose worker or, later, a remote GPU.
+    v1's generator hard-coded the answer to "which of these models is real" in two places:
+    a literal list in `capabilities()` and an `if model != "kimodo"` at the top of
+    `generate()`. Both were correct exactly once, for exactly one model. Here the registry
+    IS the answer, so `capabilities()` is truthful by construction rather than by
+    remembering to edit it.
     """
 
-    name = "kimodo"
-    ml = True
-    model_version = "Kimodo-SOMA-RP-v1.1"
+    name = "router"
 
-    def __init__(self) -> None:
-        self._stub = StubGenerator()
-        self._url = os.environ.get("BODYPROMPT_KIMODO_URL", "http://127.0.0.1:8010").rstrip("/")
-        self._timeout = float(os.environ.get("BODYPROMPT_INFERENCE_TIMEOUT", "120"))
+    def __init__(self, providers: dict[str, ModelProvider]) -> None:
+        self._providers = providers
+        self._gates = {
+            model: Gate(provider.concurrency) for model, provider in providers.items()
+        }
 
-    def _json(self, path: str, payload: dict | None = None) -> dict:
-        body = None if payload is None else json.dumps(payload).encode()
-        req = request.Request(
-            f"{self._url}{path}",
-            data=body,
-            headers={"content-type": "application/json"},
-            method="GET" if body is None else "POST",
-        )
-        try:
-            with request.urlopen(req, timeout=self._timeout) as response:
-                return json.load(response)
-        except error.HTTPError as err:
-            try:
-                detail = json.load(err).get("detail", str(err))
-            except (json.JSONDecodeError, AttributeError):
-                detail = str(err)
-            raise RuntimeError(f"Kimodo worker rejected generation: {detail}") from err
-        except (error.URLError, TimeoutError) as err:
-            raise RuntimeError(f"Kimodo worker unavailable at {self._url}: {err}") from err
+    @property
+    def ml(self) -> bool:
+        """Does anything here actually run a model?"""
+        return any(p.source != "fixture" for p in self._providers.values())
 
     def ready(self) -> bool:
-        try:
-            return bool(self._json("/health").get("ready"))
-        except RuntimeError:
-            return False
+        """
+        Usable if **any** model can generate.
+
+        Not all: a Kimodo worker being down should not make the service report itself dead
+        when SnapMoGen is up, and the frontend decides what to show per model from
+        `capabilities` anyway.
+        """
+        return any(p.ready() for p in self._providers.values())
 
     def capabilities(self) -> list[dict]:
-        return [
-            {"model": "kimodo", "source": "kimodo", "ready": self.ready()},
-            {"model": "snapmogen", "source": "fixture", "ready": self._stub.ready()},
-            {"model": "language-of-motion", "source": "fixture", "ready": self._stub.ready()},
-        ]
+        return [self._providers[model].describe() for model in sorted(self._providers)]
+
+    def provider_for(self, model: str) -> ModelProvider:
+        provider = self._providers.get(model)
+        if provider is None:
+            known = ", ".join(sorted(self._providers))
+            raise UnknownModel(f"unknown model {model!r} (configured: {known})")
+        return provider
 
     def generate(
         self,
@@ -355,59 +364,97 @@ class KimodoGenerator(Generator):
         lines: list[dict] | None = None,
         transition_frames: int = 5,
     ) -> dict:
-        if model != "kimodo":
-            return self._stub.generate(
-                model, prompt, variants, duration_seconds, seed, post_processing,
-                denoising_steps, lines, transition_frames,
-            )
-
-        chosen_seed = seed if seed is not None else secrets.randbelow(2**31)
-        started = time.perf_counter()
-        payload: dict = {
-            "variants": variants,
-            "seed": chosen_seed,
-            "post_processing": post_processing,
-            "denoising_steps": denoising_steps,
-            "transition_frames": transition_frames,
-        }
-        # One shape or the other: the worker rejects a request carrying both.
-        if lines is not None:
-            payload["lines"] = lines
-        else:
-            payload["prompt"] = prompt
-            payload["duration_seconds"] = duration_seconds
-        motion = self._json("/generate", payload)
-        # The worker may never rewrite the researcher's phrasing. For a poem the phrase is
-        # the whole poem, and the per-line prompts stay in `segments` where they belong.
-        motion["prompt"] = (
-            "\n".join(line["prompt"] for line in lines) if lines is not None else prompt
+        provider = self.provider_for(model)
+        spec = GenerationRequest(
+            model=model,
+            prompt=prompt,
+            variants=variants,
+            duration_seconds=duration_seconds,
+            # A seed of None means "pick one" — but the motion has to be able to say which
+            # one produced it, so the choice is made here, once, and travels with the
+            # request. Leaving it to the worker would put a fact about this motion
+            # somewhere the service cannot see.
+            seed=seed if seed is not None else secrets.randbelow(2**31),
+            post_processing=post_processing,
+            denoising_steps=denoising_steps,
+            lines=lines,
+            transition_frames=transition_frames,
         )
-        motion["model"] = "kimodo"
-        motion["stub"] = False
-        motion["provenance"] = {
-            "source": "kimodo",
-            "backend": self.name,
-            "model_version": self.model_version,
-            "inference_ms": round((time.perf_counter() - started) * 1000),
-            # What the worker reports it actually did, not what we asked for.
-            "post_processing": motion.pop("post_processing", None),
-            # The count the worker actually used — a request of None resolves to its
-            # configured default, and the motion must be able to say which.
-            "denoising_steps": motion.pop("denoising_steps", None),
-            # Whether the model really stitched this as one continuous motion, rather than
-            # whether we asked it to. `segments` alone would not distinguish a stitched
-            # poem from lines merely laid end to end.
-            "multi_prompt": motion.pop("multi_prompt", None),
-            "transition_frames": motion.pop("transition_frames", None),
-        }
-        return motion
+        with self._gates[model]:
+            return provider.generate(spec)
+
+
+class UnknownModel(ValueError):
+    """A model nothing is configured to serve. A bad request, not a broken service."""
+
+
+def _env_key(model: str) -> str:
+    """`language-of-motion` -> `BODYPROMPT_MODEL_LANGUAGE_OF_MOTION`."""
+    return "BODYPROMPT_MODEL_" + model.upper().replace("-", "_")
+
+
+def _provider_for(model: str, stub: StubGenerator) -> ModelProvider:
+    """
+    Build one model's provider from the environment.
+
+        BODYPROMPT_MODEL_KIMODO=http://kimodo-worker:8010   # a worker, local or remote
+        BODYPROMPT_MODEL_SNAPMOGEN=fixture                  # not real yet
+
+    A URL is a worker and nothing else distinguishes a container on this machine from a GPU
+    somewhere else. The optional companions — `_TOKEN`, `_HOSTING`, `_CONCURRENCY` — exist
+    for the remote case and for overriding the hosting guess in `providers.infer_hosting`.
+    """
+    key = _env_key(model)
+    target = os.environ.get(key, "").strip()
+    if not target or target.lower() == "fixture":
+        return FixtureProvider(model, stub)
+
+    concurrency = os.environ.get(f"{key}_CONCURRENCY", "").strip()
+    return WorkerProvider(
+        model,
+        target,
+        token=os.environ.get(f"{key}_TOKEN") or None,
+        timeout=float(os.environ.get("BODYPROMPT_INFERENCE_TIMEOUT", "120")),
+        hosting=os.environ.get(f"{key}_HOSTING") or None,
+        concurrency=int(concurrency) if concurrency else None,
+    )
+
+
+def _apply_legacy_backend() -> None:
+    """
+    Keep `BODYPROMPT_BACKEND` working.
+
+    Every existing document, compose file and shell alias in this repository says
+    `BODYPROMPT_BACKEND=kimodo`. Breaking them to make a refactor tidier would be a bad
+    trade, so the old variable is translated into the new per-model one — and only when the
+    new one is not already set, so being explicit always wins.
+    """
+    backend = os.environ.get("BODYPROMPT_BACKEND", "").strip().lower()
+    if backend != "kimodo":
+        return
+    key = _env_key("kimodo")
+    if not os.environ.get(key):
+        os.environ[key] = os.environ.get(
+            "BODYPROMPT_KIMODO_URL", "http://127.0.0.1:8010"
+        )
 
 
 def make_generator() -> Generator:
-    """Build the generator named by BODYPROMPT_BACKEND (default 'stub')."""
-    backend = os.environ.get("BODYPROMPT_BACKEND", "stub").lower()
-    factory = {"stub": StubGenerator, "kimodo": KimodoGenerator}.get(backend)
-    if factory is None:
-        known = "kimodo, stub"
-        raise ValueError(f"unknown BODYPROMPT_BACKEND={backend!r} (known: {known})")
-    return factory()
+    """
+    Build the router from the environment.
+
+    Every known model gets a provider, so `/health` always describes all three and the
+    dropdown never has a silent hole in it. Models configured beyond the known three are
+    added too, which is how a fourth arrives without a code change.
+    """
+    stub = StubGenerator()
+    _apply_legacy_backend()
+
+    configured = {
+        key[len("BODYPROMPT_MODEL_"):].lower().replace("_", "-")
+        for key in os.environ
+        if key.startswith("BODYPROMPT_MODEL_")
+        and not key.endswith(("_TOKEN", "_HOSTING", "_CONCURRENCY"))
+    }
+    models = sorted(set(KNOWN_MODELS) | configured)
+    return RouterGenerator({model: _provider_for(model, stub) for model in models})

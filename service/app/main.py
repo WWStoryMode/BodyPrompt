@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
-from .generators import make_generator
+from .generators import UnknownModel, make_generator
 from .validation import validate_motion
 
 app = FastAPI(
@@ -107,5 +107,9 @@ def generate(req: GenerateRequest) -> dict:
                 transition_frames=req.transition_frames,
             )
         )
+    except UnknownModel as err:
+        # A model nothing is configured to serve is a bad request, not a broken service.
+        # 503 would tell the caller to retry something that will never work.
+        raise HTTPException(status_code=422, detail=str(err)) from err
     except RuntimeError as err:
         raise HTTPException(status_code=503, detail=str(err)) from err

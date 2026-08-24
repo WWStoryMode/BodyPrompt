@@ -4,6 +4,20 @@ services:
       context: .
       dockerfile: service/Dockerfile
     environment:
+      # Per-model routing. A URL is a worker; "fixture" (or unset) is the hand-authored
+      # stub. Local and remote workers are configured identically — a container on this
+      # machine and a GPU somewhere else differ by the URL and nothing else, so moving a
+      # model off this box is a change to this line, not to any code.
+      #
+      #   BODYPROMPT_MODEL_SNAPMOGEN=https://gpu.example.com/snapmogen
+      #   BODYPROMPT_MODEL_SNAPMOGEN_TOKEN=…       # remote only
+      #   BODYPROMPT_MODEL_SNAPMOGEN_HOSTING=local # override the local/remote guess
+      BODYPROMPT_MODEL_KIMODO: ${BODYPROMPT_MODEL_KIMODO:-}
+      BODYPROMPT_MODEL_SNAPMOGEN: ${BODYPROMPT_MODEL_SNAPMOGEN:-fixture}
+      BODYPROMPT_MODEL_LANGUAGE_OF_MOTION: ${BODYPROMPT_MODEL_LANGUAGE_OF_MOTION:-fixture}
+      # Legacy, still honoured: BODYPROMPT_BACKEND=kimodo is translated into
+      # BODYPROMPT_MODEL_KIMODO when that is not set, so every existing command,
+      # .env and document keeps working.
       BODYPROMPT_BACKEND: ${BODYPROMPT_BACKEND:-stub}
       BODYPROMPT_KIMODO_URL: http://kimodo-worker:8010
     ports:

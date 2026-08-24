@@ -290,19 +290,47 @@ underground before a foot-plant check caught it. If you author a crouch, check t
 
 The service loads fixtures at startup, so restart it after re-compiling.
 
-## Swapping the backend
+## Where each model comes from
 
-The generator behind `POST /generate` is chosen by an environment variable:
+Routing is **per model**, not per backend. Each model is pointed at whatever serves it, and
+the three can differ:
 
 ```bash
-BODYPROMPT_BACKEND=stub uv run uvicorn app.main:app --port 8000   # fixtures; no GPU
+BODYPROMPT_MODEL_KIMODO=http://kimodo-worker:8010          # a worker on this machine
+BODYPROMPT_MODEL_SNAPMOGEN=https://gpu.example.com/snap    # a worker somewhere else
+BODYPROMPT_MODEL_LANGUAGE_OF_MOTION=fixture                # not real yet
 ```
 
-A real backend implements `Generator` (`name`, `ml`, `ready()`, `generate(model, prompt,
-variants)`), returns canonical motion, and registers itself in `_BACKENDS`. **Nothing else in
-the system changes** — not the frontend, not the renderer, not one of the four registers. That
-is the whole reason v0 was built in this order. See
-[`motion-schema.md`](motion-schema.md) for the format a backend must emit.
+A **URL is a worker**, and that is the only thing that distinguishes a container on this
+laptop from a GPU in another building. Local and remote are the same code path, because the
+memory ceiling on one machine is a fact about that machine and not something the architecture
+should be built around. Unset, or `fixture`, means the hand-authored stub — so "not real yet"
+is configuration rather than a branch in the code.
+
+Optional companions, for the remote case:
+
+| Variable | Does |
+|---|---|
+| `..._TOKEN` | sent as `Authorization: Bearer …` |
+| `..._HOSTING` | `local` or `remote`, overriding the guess below |
+| `..._CONCURRENCY` | how many generations may run at once |
+
+Local or remote is **guessed** from the URL — loopback, or a bare hostname with no dots (a
+Compose service name), is local; a dotted host is remote. It only sets the default
+concurrency: a local worker gets 1, because one GPU serves one generation at a time and the
+triptych asks for three at once. Say `..._HOSTING` when the guess is wrong.
+
+`/health` reports what each model actually resolved to, including the model version **the
+worker reported about itself** — the service never states which checkpoint is loaded
+somewhere else.
+
+`BODYPROMPT_BACKEND=stub|kimodo` still works and is translated into the per-model form, so
+older commands and `.env` files keep running. Being explicit wins over it.
+
+Adding a model means implementing a worker that speaks the canonical contract and pointing a
+variable at it. **Nothing else in the system changes** — not the frontend, not the renderer,
+not one of the four registers. That is the whole reason v0 was built in this order. See
+[`motion-schema.md`](motion-schema.md) for the format a worker must emit.
 
 ## Running the v1 Kimodo backend (experimental)
 
