@@ -25,7 +25,10 @@ services:
 
   kimodo-worker:
     profiles: ["local-gpu"]
-    build: ./inference/kimodo-worker
+    build:
+      # inference/, so the shared canonical package is inside the build context.
+      context: ./inference
+      dockerfile: kimodo-worker/Dockerfile
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
       # Model loading prints to stdout, which Python buffers when it is not a terminal.

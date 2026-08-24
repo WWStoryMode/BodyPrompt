@@ -1,0 +1,9 @@
+[project]
+name = "bodyprompt-motion"
+version = "0.1.0"
+description = "The canonical skeleton, and the parts of adapting to it that no model owns."
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26"]
+
+[tool.setuptools.packages.find]
+include = ["bodyprompt_motion*"]
