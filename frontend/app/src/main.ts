@@ -19,6 +19,7 @@ import {
   renderLabanScore,
   renderNotationStrip,
 } from "./notation";
+import type { RegisterView } from "./notation";
 import type { CanonicalMotion } from "./types";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -69,7 +70,8 @@ const registersBtnEl = $<HTMLButtonElement>("registers-btn");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
-const scoreTitleEl = $<HTMLDivElement>("score-title");
+const scoreTitleEl = $<HTMLSpanElement>("score-title");
+const scoreScopeEl = $<HTMLButtonElement>("score-scope");
 
 // the 2×2 registers view — the same motion, made legible four ways at once
 const svg = (id: string) => document.getElementById(id) as unknown as SVGSVGElement;
@@ -82,6 +84,18 @@ const regLabanSvgEl = svg("reg-laban-svg");
 let playheads: ((frame: number) => void)[] = [];
 let current: CanonicalMotion | null = null;
 let lastFrame = 0;
+
+// What the registers are drawing, in the GLOBAL frames the playhead speaks.
+//
+// A baked poem is one clip, so its first frame is global frame 0. A drafted poem is a run
+// of clips and the registers only ever hold one of them — the selected line's — so that
+// clip starts somewhere partway through. Without this offset the "now" marker on a drafted
+// poem walks off the end of the register it is drawn on.
+let stageStart = 0;
+/** Global frames where a line begins. Only a bake has these; a draft has no seams to mark. */
+let stageBoundaries: number[] = [];
+/** The poem lines the timeline's entries correspond to, in order. */
+let playingLines: PoemLine[] = [];
 
 // ---- renderer + the poem ----
 const renderer = new StickFigureRenderer(stageEl);
@@ -188,7 +202,8 @@ function selectLine(id: number): void {
   if (poem.selectedId === id) return;
   poem.selectedId = id;
   renderPoem();
-  // The registers and the ghost-cloud follow the line being worked on.
+  // The ghost-cloud follows the line being worked on. The registers do not — they follow
+  // the body (see `registerView`).
   if (!poem.bakeIsCurrent) showCurrent({ keepPlayhead: true });
 }
 
@@ -240,7 +255,9 @@ let loopingLineId: number | null = null;
 
 function toggleLoopLine(id: number): void {
   loopingLineId = loopingLineId === id ? null : id;
-  const at = poem.written.findIndex((line) => line.id === id);
+  // Segment indices count the lines ON THE STAGE — for a draft that is only the generated
+  // ones, so a written-but-ungenerated line must not be counted along the way.
+  const at = playingLines.findIndex((line) => line.id === id);
   if (loopingLineId !== null && at >= 0) {
     renderer.setLoop("line", at);
     renderer.seekSegment(at);
@@ -251,7 +268,7 @@ function toggleLoopLine(id: number): void {
 }
 
 function jumpToLine(id: number): void {
-  const at = poem.written.findIndex((line) => line.id === id);
+  const at = playingLines.findIndex((line) => line.id === id);
   if (at >= 0) renderer.seekSegment(at);
 }
 
@@ -361,28 +378,95 @@ function setComparing(on: boolean): void {
 let reading = false;
 
 /**
+ * Which reading the registers give: the whole poem, or one line of it.
+ *
+ * These are not zoom levels. Every register normalises against the frames it is handed —
+ * levels, magnitudes, the floor's scale — so a line read alone is drawn against its own
+ * range, and a quiet line that vanishes inside the whole poem becomes legible. That also
+ * means the two readings cannot be compared with each other, which is why the rail says
+ * out loud which one is on screen.
+ *
+ * Narrowed, the register follows the line the body is **playing**, not the line the cursor
+ * is in. The score is a reading of the movement, so it should say what the body is doing
+ * now; the writer's cursor is somewhere else most of the time, and a score that followed it
+ * would describe a line nobody is watching. Pinning a line is what looping is for (`L`),
+ * and it works on the score for free — pin the body and the score stays with it.
+ */
+type ScoreScope = "poem" | "line";
+let scoreScope: ScoreScope = "poem";
+
+/** The line a narrowed register is reading: the one the playhead is inside. */
+function readingSegment(): number {
+  return renderer.segmentIndex;
+}
+
+/** The window the registers should read, for whatever is currently on the stage. */
+function registerView(): RegisterView {
+  const segments = current?.segments ?? [];
+  if (scoreScope === "line" && segments.length) {
+    const segment = segments[readingSegment()];
+    if (segment) {
+      return {
+        range: { start: segment.start_frame, end: segment.end_frame },
+        globalStart: segment.start_frame,
+      };
+    }
+  }
+  return { globalStart: stageStart, boundaries: stageBoundaries };
+}
+
+/** Say which line is being read, so a narrowed register is never mistaken for the poem. */
+function updateScoreHead(): void {
+  const segments = current?.segments ?? [];
+  // Narrowing only means anything for a baked poem: a drafted line is already its own clip,
+  // and the registers are already reading it alone.
+  scoreScopeEl.disabled = segments.length < 2;
+  scoreScopeEl.title = scoreScopeEl.disabled
+    ? "one line at a time — needs a baked poem of more than one line"
+    : "Read the line the body is playing (N)";
+  const narrowed = scoreScope === "line" && !scoreScopeEl.disabled;
+  scoreScopeEl.textContent = narrowed ? "this line" : "whole poem";
+  scoreScopeEl.classList.toggle("on", narrowed);
+  if (performing) return; // performance mode owns the title
+  scoreTitleEl.textContent = narrowed
+    ? `notation · line ${readingSegment() + 1}`
+    : "notation · the score";
+}
+
+/**
  * Rebuild every register from the current motion, and re-seat the playheads.
  * The registers view is only drawn while it is open — four more SVGs is not free, and it
  * is closed most of the time.
  */
 function buildScore(): void {
+  updateScoreHead();
   if (!current) return;
+  const view = registerView();
   playheads = [
-    renderNotationStrip(notationSvgEl, current),
-    renderFloorPath(floorSvgEl, current),
+    renderNotationStrip(notationSvgEl, current, view),
+    renderFloorPath(floorSvgEl, current, view),
   ];
   if (reading) {
     playheads.push(
-      renderChronophotograph(regChronoSvgEl, current),
-      renderNotationStrip(regStripSvgEl, current),
-      renderFloorPath(regFloorSvgEl, current),
-      renderLabanScore(regLabanSvgEl, current),
+      renderChronophotograph(regChronoSvgEl, current, view),
+      renderNotationStrip(regStripSvgEl, current, view),
+      renderFloorPath(regFloorSvgEl, current, view),
+      renderLabanScore(regLabanSvgEl, current, view),
     );
   }
   // the renderer only emits while playing, so a score built during a pause would sit at
   // frame 0 until you hit play — put the playheads where the body actually is
   for (const set of playheads) set(lastFrame);
 }
+
+function setScoreScope(scope: ScoreScope): void {
+  scoreScope = scope;
+  buildScore();
+}
+
+scoreScopeEl.addEventListener("click", () =>
+  setScoreScope(scoreScope === "line" ? "poem" : "line"),
+);
 
 function setReading(on: boolean): void {
   if (on && comparing) setComparing(false); // only one full-stage view at a time
@@ -419,6 +503,7 @@ function setPerforming(on: boolean): void {
   performEl.textContent = on ? "Exit" : "Perform";
   modePillEl.textContent = on ? "Performance" : "Search instrument · live";
   scoreTitleEl.textContent = on ? "the score · for the body" : "notation · the score";
+  if (!on) updateScoreHead(); // the title may be naming a line, not the whole poem
 
   if (on) {
     tempoIdx = 0; // performance opens at half speed — a body has to be able to follow it
@@ -442,25 +527,39 @@ function cycleTempo(): void {
  * as separate clips — which is exactly what they are, seams and all.
  */
 function showCurrent(opts: { keepPlayhead?: boolean } = {}): void {
-  const baked = poem.bakeIsCurrent ? poem.bakedMotion : poem.bakedMotion;
+  const baked = poem.bakedMotion;
   const usingBake = poem.bakeIsCurrent && baked !== null;
-  const drafts = poem.written
-    .map((line) => line.motion)
-    .filter((motion): motion is CanonicalMotion => motion !== null);
+  const drafted = poem.written.filter((line) => line.motion !== null);
+  const drafts = drafted.map((line) => line.motion as CanonicalMotion);
 
-  if (usingBake && baked) {
+  // A bake plays whenever it is current, and also when it is not but there is nothing
+  // drafted to show instead — keeping the older reading on the stage rather than going
+  // blank, with the banner saying it is out of date.
+  if (baked && (usingBake || drafts.length === 0)) {
     current = baked;
-    renderer.loadSequence([baked], { keepPlayhead: opts.keepPlayhead });
-  } else if (baked && drafts.length === 0) {
-    // Edited since baking, with nothing drafted to show instead: keep the old reading on
-    // the stage rather than going blank, and let the banner say it is out of date.
-    current = baked;
+    stageStart = 0;
+    // If the bake is stale these lines may no longer be the ones it was made from, so a
+    // line added or removed since can put the highlight one line out. The banner already
+    // says this reading is not the poem; the next bake resets it.
+    playingLines = poem.written;
+    // The first line begins at frame 0 — that is the start of the poem, not a seam.
+    stageBoundaries = (baked.segments ?? []).slice(1).map((segment) => segment.start_frame);
     renderer.loadSequence([baked], { keepPlayhead: opts.keepPlayhead });
   } else if (drafts.length) {
     const selected = poem.selected;
     // The ghost-cloud is a per-line instrument: it shows the line being worked on.
     const ghosts = selected?.motion?.variants ?? [];
     current = selected?.motion ?? drafts[0];
+    // Only the lines that have actually been drafted are on the stage — a written but
+    // ungenerated line contributes no clip, so it must not shift the count either.
+    playingLines = drafted;
+    // The registers hold one clip out of the run; find where it starts in global frames.
+    const at = drafts.indexOf(current);
+    stageStart = drafts.slice(0, Math.max(0, at)).reduce((n, clip) => n + clip.frames.length, 0);
+    // Drafts are separate generations laid end to end. They have joins, not seams, and the
+    // banner already says so — marking them on the score would dress a break as a
+    // transition. A drafted register shows one line, and only that line.
+    stageBoundaries = [];
     renderer.loadSequence(drafts, { ghosts, keepPlayhead: opts.keepPlayhead });
   } else {
     return; // nothing generated yet — the hint is still on screen
@@ -518,7 +617,10 @@ renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
 
   if (segmentIndex !== shownSegment) {
     shownSegment = segmentIndex;
-    const line = poem.written[segmentIndex];
+    // A narrowed register is reading the line that just ended. Re-read the new one — this
+    // fires once per line boundary, not per frame.
+    if (scoreScope === "line") buildScore();
+    const line = playingLines[segmentIndex];
     // The room reads the sentence the body is answering right now, not the whole poem.
     if (line) perfPhraseEl.textContent = `“${line.text}”`;
     for (const [id, row] of rows) row.classList.toggle("playing", id === line?.id);
@@ -733,6 +835,9 @@ window.addEventListener("keydown", (e) => {
       break;
     case "l":
       if (poem.selectedId !== null) toggleLoopLine(poem.selectedId);
+      break;
+    case "n":
+      if (!scoreScopeEl.disabled) setScoreScope(scoreScope === "line" ? "poem" : "line");
       break;
   }
 });

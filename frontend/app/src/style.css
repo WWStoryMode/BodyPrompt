@@ -142,6 +142,23 @@ html, body {
   padding: 14px 16px 10px;
   border-bottom: 1px solid var(--line);
 }
+.score-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.scope-btn {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.scope-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+.scope-btn.on { color: var(--accent); border-color: var(--accent); }
+.scope-btn:disabled { opacity: 0.35; cursor: default; }
+
 .rail-scroll { flex: 1; overflow: auto; padding: 8px 4px; }
 .rail-hint {
   font-family: var(--mono);
@@ -266,6 +283,13 @@ html, body {
 .nota-head { fill: var(--accent); }
 .nota-still { fill: var(--ink-faint); }
 .nota-now { stroke: var(--ghost); stroke-width: 1.4; opacity: 0.85; }
+/* where one line hands the body to the next — dashed, so it never reads as a glyph */
+.nota-seam {
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.75;
+}
 
 /* the chronophotograph — successive exposures, the newest solid, the oldest nearly gone */
 .chrono-ground { stroke: var(--line); stroke-width: 1; }
@@ -294,6 +318,8 @@ html, body {
 .floor-foot { fill: none; stroke: var(--ink-faint); stroke-width: 1; opacity: 0.55; }
 .floor-start { fill: none; stroke: var(--ink-dim); stroke-width: 1.4; }
 .floor-now { fill: var(--accent); }
+/* a line's first step, ticked across the trace */
+.floor-seam { stroke: var(--ink-dim); stroke-width: 1.4; opacity: 0.9; }
 
 /* ---- stage ---- */
 .body { flex: 1; display: flex; min-height: 0; }
