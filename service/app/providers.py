@@ -30,8 +30,19 @@ import json
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Protocol
 from urllib import error, parse, request
+
+
+def utc_now() -> str:
+    """When something happened, in UTC, to the second.
+
+    Lives here because provenance is written here. A motion has to be able to say *when* it
+    was generated, not only how long it took, or the store in `store.py` cannot serve it
+    again without the moment collapsing into the moment it was served.
+    """
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @dataclass(frozen=True)
@@ -215,6 +226,8 @@ class WorkerProvider:
             "backend": self.model,
             "model_version": self._model_version or self._version_or_unknown(),
             "hosting": self.hosting,
+            # When, and how long. The store replays a motion without touching either.
+            "generated_at": utc_now(),
             "inference_ms": round((time.perf_counter() - started) * 1000),
             # Everything below is what the worker reports it actually DID, not what we
             # asked for. A request and its answer are different claims.

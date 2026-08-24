@@ -39,10 +39,28 @@ export interface CanonicalMotion {
   seed: number;
   /** Additive v1 truth about where this motion actually came from. */
   provenance?: {
-    source: "kimodo" | "fixture";
+    /**
+     * What produced it: a model name, or `"fixture"`. Deliberately not a closed union —
+     * a fourth model becoming real is a configuration change on the service (see
+     * `service/app/generators.py`), and it should not also be a type edit here.
+     */
+    source: string;
     backend: string;
     model_version: string;
+    /** Where the model ran: "local", "remote", or "in-process". */
+    hosting?: string;
+    /** When the model produced this motion, ISO 8601. Untouched by a replay. */
+    generated_at?: string;
     inference_ms: number;
+    /**
+     * True when this motion came back out of the service's store rather than being
+     * generated again. It is the **same generation**, not a new one: `generated_at` and
+     * `inference_ms` still describe the original run, and `served_at` says when this copy
+     * was handed over. See `service/app/store.py`.
+     */
+    served_from_store?: boolean;
+    /** When this copy was served from the store. Absent on a fresh generation. */
+    served_at?: string;
     /** Kimodo's foot-skate cleanup: what the worker did, not what was asked. */
     post_processing?: boolean | null;
     /** DDIM steps actually used — absolute count. Null for fixtures. */

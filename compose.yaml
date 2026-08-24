@@ -20,6 +20,15 @@ services:
       # .env and document keeps working.
       BODYPROMPT_BACKEND: ${BODYPROMPT_BACKEND:-stub}
       BODYPROMPT_KIMODO_URL: http://kimodo-worker:8010
+      # What the service remembers (v3 Stage C). A motion is keyed by everything that
+      # decided it, so a seeded request replays without the model that answered it the
+      # first time — including with its worker stopped. Set to "off" to keep nothing.
+      BODYPROMPT_STORE_DIR: /var/lib/bodyprompt/motions
+      BODYPROMPT_STORE_LIMIT: ${BODYPROMPT_STORE_LIMIT:-500}
+    volumes:
+      # A named volume, not a bind mount: this outlives `compose up --build` and every
+      # image rebuild, which is the entire point of remembering.
+      - motion-store:/var/lib/bodyprompt/motions
     ports:
       - "8000:8000"
 
@@ -83,3 +92,4 @@ services:
 volumes:
   huggingface-cache:
   embedding-cache:
+  motion-store:

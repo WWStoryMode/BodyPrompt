@@ -48,7 +48,7 @@ One motion is one JSON object:
 | `model` | Which model (nominally) produced it. In v0 this is just an echo. |
 | `seed` | Generation seed — part of making variation reproducible. |
 | `variants` | *Optional.* The **ghost-cloud**: sibling motions from the same prompt with different seeds (see below). |
-| `provenance` | *Optional, v1.* Honest source metadata: `source`, `backend`, `model_version`, and measured `inference_ms`. |
+| `provenance` | *Optional, v1.* Honest source metadata: where it came from, when, and how long it took (see below). |
 | `segments` | *Optional, v2.* Present only on a **poem**: where each line's movement sits in `frames` (see below). |
 
 ## The ghost-cloud (`variants`)
@@ -103,6 +103,47 @@ movement lives:
 > backend's poem is exactly that: it loops a fixture per line and slides each so the pelvis
 > continues, which moves the root but not the limbs. It records
 > `provenance.multi_prompt: null` — no model stitched it — and `stub: true`.
+
+## Provenance
+
+Everything here describes **what happened**, never what was requested. The distinction is
+load-bearing: a request for post-processing that the worker did not apply must read as
+`false`, and a request that named no denoising steps must record the number the worker
+actually used.
+
+| Field | Meaning |
+|---|---|
+| `source` | What produced it — a model name (`kimodo`, `snapmogen`), or `fixture`. Not a closed set: a fourth model becoming real is a configuration change, not a schema change. |
+| `backend` | The generator that served it. |
+| `model_version` | What the worker reported it is running, learned from its `/health` rather than declared by the service. |
+| `hosting` | *v3.* Where the model ran: `local`, `remote`, or `in-process`. |
+| `generated_at` | *v3.* When the model produced this motion, ISO 8601 UTC. |
+| `inference_ms` | Measured wall-clock time of the generation. |
+| `served_from_store` | *v3.* `true` when this motion came back out of the service's store rather than being generated again — see below. |
+| `served_at` | *v3.* When this copy was handed over. Present **only** on a stored motion. |
+| `post_processing` | What the worker actually did. `null` for a fixture: nothing ran, so there was nothing to clean up. |
+| `denoising_steps` | The count that actually ran. `null` for a fixture. |
+| `multi_prompt` | Whether the model genuinely stitched a poem as one continuous motion. `null` = nothing generated it. |
+| `transition_frames` | Frames overlapped between lines. `null` when this is not a stitched poem. |
+
+### A remembered motion is the same generation
+
+The service keeps motions on disk, keyed by everything that decided them (see
+[`v3-models.md`](v3-models.md) and `service/app/store.py`). When a request names a **seed**
+and that exact request has been answered before, the stored motion is returned instead of
+the model being run again.
+
+Such a motion is **the same generation, served twice** — not a new one, and the schema says
+so precisely:
+
+- `served_from_store` becomes `true`.
+- `generated_at` and `inference_ms` are the **original** run's. They are never refreshed.
+  A replay that reported the milliseconds a disk read took would be a lie about how fast
+  the model is, and a flattering one.
+- `served_at` is added, so the two moments cannot be confused.
+
+A request with **no seed** is a request for a new roll, and is never answered from the
+store — otherwise the ghost-cloud, which is entirely a claim about seeds, would be false.
 
 ## Skeleton `smpl-22`
 

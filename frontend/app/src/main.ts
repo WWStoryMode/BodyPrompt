@@ -21,6 +21,8 @@ import {
 } from "./notation";
 import type { RegisterView } from "./notation";
 import type { CanonicalMotion } from "./types";
+import { openAutosave } from "./autosave";
+import { fromSession, restore, sessionFilename, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
 const API_BASE = "http://localhost:8000";
@@ -72,6 +74,11 @@ const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
 const scoreTitleEl = $<HTMLSpanElement>("score-title");
 const scoreScopeEl = $<HTMLButtonElement>("score-scope");
+const sessionStatusEl = $<HTMLSpanElement>("session-status");
+const sessionExportEl = $<HTMLButtonElement>("session-export");
+const sessionImportEl = $<HTMLButtonElement>("session-import");
+const sessionNewEl = $<HTMLButtonElement>("session-new");
+const sessionFileEl = $<HTMLInputElement>("session-file");
 
 // the 2×2 registers view — the same motion, made legible four ways at once
 const svg = (id: string) => document.getElementById(id) as unknown as SVGSVGElement;
@@ -99,7 +106,109 @@ let playingLines: PoemLine[] = [];
 
 // ---- renderer + the poem ----
 const renderer = new StickFigureRenderer(stageEl);
-const poem = new Poem(["a body remembers a place it cannot return to"]);
+// Not `const`: a session can be opened from a file, or restored from the browser, and what
+// arrives is a whole poem rather than an edit to this one. Everything that reads `poem`
+// reads it through this binding, and `adoptPoem` is the only thing that moves it.
+let poem = new Poem(["a body remembers a place it cannot return to"]);
+
+// ---- where the search lives ----
+//
+// Two layers, and they answer different questions. The **browser's copy** is insurance: it
+// exists because a reload used to destroy the poem and every line's history with it, and
+// nobody remembers to export before a tab crashes. The **session file** is the answer to
+// the question the README parked — *whose is the search?* — and it answers: the writer's.
+// Self-contained, portable, and it opens with the service switched off.
+
+const autosave = openAutosave();
+
+function setSessionStatus(text: string, warn = false): void {
+  sessionStatusEl.textContent = text;
+  sessionStatusEl.classList.toggle("warn", warn);
+}
+
+autosave.onStatus(({ saved, at, problem }) => {
+  if (problem) setSessionStatus(problem, true);
+  else if (saved && at) {
+    const clock = at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setSessionStatus(`session · kept ${clock}`);
+  }
+});
+
+/**
+ * Replace the poem on the bench with another one — from a file, or from the browser's copy.
+ *
+ * Everything that outlived the old poem has to go with it: the editor rows are keyed by
+ * line id and two poems can use the same ids, the loop is pinned to a line that no longer
+ * exists, and the renderer is still holding the previous body. A stage that kept the last
+ * poem's figure standing under this poem's lines would be showing movement that belongs to
+ * a sentence nobody can see.
+ */
+function adoptPoem(next: Poem): void {
+  poem = next;
+  rows.clear();
+  poemLinesEl.replaceChildren();
+  loopingLineId = null;
+  renderer.setLoop("whole");
+  shownSegment = -1;
+  playingLines = [];
+  stageStart = 0;
+  stageBoundaries = [];
+  current = null;
+  lastFrame = 0;
+  playheads = [];
+
+  renderPoem();
+  updateBanner();
+  showCurrent(); // puts back whatever this session already had generated
+
+  if (!current) {
+    // Nothing in this poem has been generated. Take the previous body off the stage rather
+    // than leaving it there under a fresh poem's hint.
+    renderer.clear();
+    clearScore();
+    hintEl.classList.remove("hidden");
+    telemetryEl.innerHTML = "";
+    counterEl.textContent = "";
+    playPauseEl.textContent = "Play";
+    scrubEl.value = "0";
+  }
+}
+
+function exportSession(): void {
+  const session = toSession(poem);
+  const blob = new Blob([JSON.stringify(session)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = sessionFilename(session, poem);
+  link.click();
+  URL.revokeObjectURL(url);
+  setSessionStatus(`session · exported ${link.download}`);
+}
+
+async function importSession(file: File): Promise<void> {
+  try {
+    adoptPoem(restore(fromSession(JSON.parse(await file.text()))));
+    setSessionStatus(`session · opened ${file.name}`);
+  } catch (err) {
+    // Never half-load. A poem missing most of itself looks exactly like a poem.
+    setSessionStatus(`could not open ${file.name}: ${(err as Error).message}`, true);
+  }
+}
+
+sessionExportEl.addEventListener("click", exportSession);
+sessionImportEl.addEventListener("click", () => sessionFileEl.click());
+sessionFileEl.addEventListener("change", () => {
+  const file = sessionFileEl.files?.[0];
+  sessionFileEl.value = ""; // so picking the same file twice fires twice
+  if (file) void importSession(file);
+});
+sessionNewEl.addEventListener("click", () => {
+  if (!confirm("Start an empty poem? Export this one first if you want to keep it.")) return;
+  void autosave.clear();
+  adoptPoem(new Poem([""]));
+  setSessionStatus("session · new");
+});
 
 // ---- the poem editor ----
 //
@@ -196,6 +305,11 @@ function renderPoem(): void {
     row.classList.toggle("looping", loopingLineId === line.id);
     row.querySelector(".poem-state")!.setAttribute("title", STATE_TITLE[line.state] ?? "");
   });
+
+  // Every mutation of the poem already comes through here, which makes this the one place
+  // autosave cannot be forgotten at a new call site. `queue` is debounced and builds the
+  // snapshot only when it fires, so a keystroke costs a timer reset and nothing more.
+  autosave.queue(() => toSession(poem));
 }
 
 function selectLine(id: number): void {
@@ -459,6 +573,14 @@ function buildScore(): void {
   for (const set of playheads) set(lastFrame);
 }
 
+/** Empty every register. Used when the session is replaced by one with nothing on stage. */
+function clearScore(): void {
+  playheads = [];
+  for (const el of [notationSvgEl, floorSvgEl, regChronoSvgEl, regStripSvgEl, regFloorSvgEl, regLabanSvgEl]) {
+    el.replaceChildren();
+  }
+}
+
 function setScoreScope(scope: ScoreScope): void {
   scoreScope = scope;
   buildScore();
@@ -594,7 +716,13 @@ function showTelemetry(usingBake: boolean): void {
         (provenance.denoising_steps
           ? ` · ${provenance.denoising_steps} steps`
           : "") +
-        `<br>`
+        `<br>` +
+        // A remembered motion is the SAME generation, served again — the seconds above are
+        // the original run's, not this one's, and the stage says so rather than letting a
+        // replay read as a fast model.
+        (provenance.served_from_store
+          ? `<span class="k">memory</span> remembered · not regenerated<br>`
+          : "")
       : "") +
     (ghostCount
       ? `<span class="k">cloud</span> ${ghostCount} other seeds<br>`
@@ -842,11 +970,48 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Draw the poem, then draft its first line so the stage is not empty (and fail gracefully
-// if the service is down). Bake is a deliberate act, never something that just happens.
-renderPoem();
-updateBanner();
-void refreshCapabilities().then(() => draftLine());
+/**
+ * Open the instrument.
+ *
+ * The browser's copy comes first, before anything is drawn: whatever is on screen at the
+ * first render is what autosave will write back, so restoring after that would overwrite
+ * the session with the default poem it was supposed to replace.
+ *
+ * A restored session is never re-generated. Its motions are in the file — that is the whole
+ * point of keeping them — so the stage is rebuilt from what is there, with nothing loaded
+ * and no request made. Only a genuinely fresh start drafts its first line so the stage is
+ * not empty. Bake stays a deliberate act, as it always has.
+ */
+async function start(): Promise<void> {
+  const stored = await autosave.load();
+  let restored = false;
+  if (stored) {
+    try {
+      poem = restore(fromSession(stored));
+      restored = true;
+    } catch (err) {
+      setSessionStatus(`the autosaved session could not be read: ${(err as Error).message}`, true);
+    }
+  }
+
+  renderPoem();
+  updateBanner();
+  if (!autosave.available) {
+    // Private windows and blocked site data. Say it plainly — a writer who thinks their
+    // work is being kept and is wrong is worse off than one who knows it is not.
+    setSessionStatus(autosave.problem ?? "session · not kept in this browser", true);
+  } else if (restored) {
+    setSessionStatus("session · restored");
+  } else {
+    setSessionStatus("session · new");
+  }
+
+  await refreshCapabilities();
+  if (restored) showCurrent();
+  else void draftLine();
+}
+
+void start();
 
 // Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
 // projector without fumbling through chrome in front of a room); ?compare=1 opens the

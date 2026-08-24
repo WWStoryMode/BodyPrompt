@@ -77,6 +77,20 @@
           <div class="rail-scroll">
             <div id="poem-lines" class="poem-lines"></div>
           </div>
+          <!-- Where a search lives. The browser keeps a copy so a reload stops
+               destroying the poem; the file is the writer's own, self-contained, and
+               opens with the service switched off. -->
+          <div class="session-bar">
+            <span id="session-status" class="session-status" aria-live="polite">session</span>
+            <button id="session-export" class="scope-btn" title="Save this session to a file you own">
+              Export
+            </button>
+            <button id="session-import" class="scope-btn" title="Open a session file">
+              Import
+            </button>
+            <button id="session-new" class="scope-btn" title="Start an empty poem">New</button>
+            <input id="session-file" type="file" accept="application/json,.json" hidden />
+          </div>
           <div class="rail-hint">
             <b>enter</b> new line · <b>↑↓</b> move · <b>double-click</b> to jump ·
             <b>↻</b> loop one line

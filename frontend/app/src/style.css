@@ -170,6 +170,28 @@ html, body {
 }
 .rail-hint b { color: var(--ink-dim); }
 
+/* ---- where the search lives: the browser's copy, and the writer's own file ---- */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+}
+.session-status {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Autosave off, or a save that failed. Never silent: the writer is owed the difference
+   between "kept" and "not kept". */
+.session-status.warn { color: #df8a7d; }  /* the same red the stale-bake banner uses */
+
 /* ---- the poem: each line a prompt, each with its own state ---- */
 .rail-poem { width: 300px; }
 .poem-lines { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; }
@@ -432,6 +454,7 @@ html, body {
 #app.performing .counter,
 #app.performing .toggle,
 #app.performing .rail-hint,
+#app.performing .session-bar,
 #app.performing .nota-key { display: none; }
 #app.performing .scrub { opacity: 0.35; }
 #app.performing .btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }

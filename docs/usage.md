@@ -135,6 +135,25 @@ only add noise — the ghost-cloud compares **seeds**, the triptych compares **m
 
 *(In v0 this is a seeded perturbation, not a model sampling. See [`v0-stub.md`](v0-stub.md).)*
 
+### Keeping the poem — the session bar
+
+At the foot of the poem rail: **Export**, **Import**, **New**, and a line saying whether
+anything is being kept.
+
+- **The browser keeps a copy automatically.** A reload no longer destroys the poem. The
+  status line says `session · kept 14:32` after each save, and it saves about a second after
+  you stop typing. On a restored session the instrument re-opens what was there and
+  **generates nothing** — the motions were in the copy.
+- **Export** writes a session file: every line, every line's history, the bake, and the
+  motions themselves. It is yours, it is self-contained, and it opens on another machine
+  with the service switched off. Put it beside your notes.
+- **Import** opens one. A file that is not a session says so rather than half-loading.
+- **New** starts an empty poem. It asks first, and Export is right there.
+
+If the browser refuses storage — a private window, blocked site data — the status line turns
+red and says so. Nothing pretends to have been saved. The format is documented in
+[`session-schema.md`](session-schema.md).
+
 ---
 
 ## The four notation registers — <kbd>R</kbd>
@@ -319,6 +338,41 @@ Local or remote is **guessed** from the URL — loopback, or a bare hostname wit
 Compose service name), is local; a dotted host is remote. It only sets the default
 concurrency: a local worker gets 1, because one GPU serves one generation at a time and the
 triptych asks for three at once. Say `..._HOSTING` when the guess is wrong.
+
+## What the service remembers
+
+The service keeps every motion it generates, on disk, keyed by everything that decided it —
+model, prompt or lines, seed, and the sampling settings. Compose points it at a named volume,
+so it survives rebuilds:
+
+```bash
+BODYPROMPT_STORE_DIR=/var/lib/bodyprompt/motions   # "off" keeps nothing
+BODYPROMPT_STORE_LIMIT=500                         # motions, evicted least-recently-used
+```
+
+`GET /health` reports whether it is on and how much is in it; `GET /motions` lists what is
+kept — metadata only, never the frames.
+
+**A request that names a seed replays instead of running the model.** That is the point of
+keeping them, and it is easiest to see by stopping the model first:
+
+```bash
+REQ='{"model":"snapmogen","prompt":"a body remembers","seed":7,"duration_seconds":5}'
+curl -s localhost:8000/generate -H 'content-type: application/json' -d "$REQ" | head -c 200
+docker compose stop snapmogen-worker
+curl -s localhost:8000/generate -H 'content-type: application/json' -d "$REQ" | head -c 200
+```
+
+The second call returns the same motion with `"served_from_store": true`, the original
+`generated_at`, and the original `inference_ms` — because it **is** the original generation,
+served again, not a fast one. A prompt that was never generated still fails, honestly, with
+the worker's address in the message.
+
+A request with **no seed** is never answered from the store: it is asking for a new roll, and
+the ghost-cloud is entirely a claim about seeds. The instrument itself never sends a seed, so
+in ordinary use the store records and does not replay; a UI for reaching it comes with the
+triptych. The store is *not* a backup of your poem — [the session file](session-schema.md)
+is, and it is the copy that matters.
 
 `/health` reports what each model actually resolved to, including the model version **the
 worker reported about itself** — the service never states which checkpoint is loaded

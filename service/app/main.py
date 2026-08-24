@@ -5,10 +5,14 @@ Exposes the real API contract the frontend talks to:
 
     POST /generate  { "model": str, "prompt": str }  ->  canonical motion (bodyprompt.motion/v0)
 
-The thing that *produces* the motion is a pluggable backend (see generators.py), chosen by
-the BODYPROMPT_BACKEND env var. The default is the no-ML "stub" (hand-authored fixtures);
-the v1 "kimodo" backend delegates to an isolated local-GPU worker behind the same contract.
-See docs/motion-schema.md and docs/v1-implementation.md.
+Three questions sit behind that one line, and v3 keeps them apart:
+
+- **where a model lives** — providers.py; a local container and a remote GPU differ by a URL
+- **which model a request goes to** — generators.py, from per-model environment variables
+- **what is kept** — store.py; a seeded request replays without the model that answered it
+
+The default is the no-ML "stub" (hand-authored fixtures), so the whole loop runs with no GPU.
+See docs/motion-schema.md, docs/v1-implementation.md and docs/v3-models.md.
 """
 
 from fastapi import FastAPI, HTTPException
@@ -79,6 +83,11 @@ class GenerateRequest(BaseModel):
         return self
 
 
+#: What the service remembers, if anything. `None` on a generator with no store — the
+#: attribute is looked up rather than assumed so a bare `StubGenerator` still works.
+STORE = getattr(GENERATOR, "store", None)
+
+
 @app.get("/health")
 def health() -> dict:
     return {
@@ -87,7 +96,25 @@ def health() -> dict:
         "ml": GENERATOR.ml,
         "ready": GENERATOR.ready(),
         "capabilities": GENERATOR.capabilities(),
+        # Whether remembering is on is a fact about the service, not about any model, so
+        # it sits beside the capabilities rather than inside one of them.
+        "store": STORE.stats() if STORE else {"enabled": False},
     }
+
+
+@app.get("/motions")
+def motions(limit: int = 50) -> dict:
+    """
+    What the service remembers, newest first — metadata only, never the motions themselves.
+
+    A listing that returned megabytes of frames would be unusable, and there is nothing here
+    that a re-issued request cannot fetch in full: each entry carries the model, prompt and
+    seed that produced it, and asking `POST /generate` for exactly those replays the stored
+    motion **without the model being loaded at all**. See docs/usage.md.
+    """
+    if not STORE:
+        return {"enabled": False, "entries": []}
+    return {**STORE.stats(), "entries": STORE.entries(max(1, min(500, limit)))}
 
 
 @app.post("/generate")

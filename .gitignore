@@ -21,6 +21,10 @@ build/
 *.egg-info/
 .env
 
+# What the service remembers (v3 Stage C). Motions are regenerable and can run to hundreds
+# of MB; a session file, which is the writer's own copy, is exported deliberately instead.
+service/.motions/
+
 # Model weights: large, and SnapMoGen's are under Snap Inc.'s non-commercial licence,
 # which is not this repository's to redistribute. See the README in that directory.
 inference/snapmogen-worker/checkpoints/*
