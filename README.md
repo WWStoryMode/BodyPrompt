@@ -332,8 +332,15 @@ Kimodo model is selected. It currently requires:
   `meta-llama/Meta-Llama-3-8B-Instruct` repository on Hugging Face; and
 - a fine-grained Hugging Face read token.
 
-Copy `.env.example` to `.env`, set `BODYPROMPT_BACKEND=kimodo`, and add the token as
-`HF_TOKEN`. Do not put the token directly in a shell command or commit `.env`.
+Copy `.env.example` to `.env`, point Kimodo at its worker with
+`BODYPROMPT_MODEL_KIMODO=http://kimodo-worker:8010`, and add the token as `HF_TOKEN`. Do not
+put the token directly in a shell command or commit `.env`.
+
+Routing is **per model**: a URL is a worker, `fixture` is the hand-authored stub, and a
+worker on this machine and one on a remote GPU are configured identically. So SnapMoGen and
+Language of Motion stay fixtures by saying nothing about them. (`BODYPROMPT_BACKEND=kimodo`
+still works and is translated into the same thing.) See
+[`docs/usage.md`](docs/usage.md#where-each-model-comes-from).
 
 ```bash
 docker run --rm --gpus all \
