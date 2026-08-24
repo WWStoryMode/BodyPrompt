@@ -173,7 +173,7 @@ in front of an audience:
 | **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
-| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; the poem is kept; the triptych reads a whole poem; Language of Motion still a fixture |
+| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ✓ done — all three models real, the poem is kept, the triptych reads a whole poem |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
@@ -362,9 +362,12 @@ fixture quick start. The first worker start downloads large model files into the
 `huggingface-cache` Docker volume. Avoid `docker compose down -v` unless you intend to
 delete that cache.
 
-A usable health response has `"backend":"kimodo"`, `"ml":true` and `"ready":true`. Only
-output labelled with runtime provenance `source: kimodo` is real model output; SnapMoGen and
-Language of Motion remain fixtures.
+A usable health response has `"ml":true` and, per model, `"ready":true`. **Only output whose
+runtime provenance names a model is real model output** — `source: kimodo`,
+`source: snapmogen`, `source: language-of-motion`. `source: fixture` is a hand-authored
+stand-in, whatever the dropdown says. As of v3 all three can be real, and each is real only
+when its own worker is configured and up; `/health` answers that per model rather than for
+the service as a whole.
 
 This path has been validated on an RTX 5080: the motion is real, the skeleton is
 anatomically sound, and the latency is measured. One prompt plus a ghost-cloud takes about
@@ -443,9 +446,17 @@ keeping its native way of authoring) and **performance mode** (the projectable s
   understood and the ghost-cloud is seeded perturbation.
 - With the v1 backend, only an output whose runtime provenance says `source: kimodo` is a
   model generation. The UI derives that label from `/health`, not from the selected name.
-- **Language of Motion remains a fixture.** SnapMoGen became real in v3 (2026-08-24), so the
-  triptych now compares **two real models and one stand-in** — better than it was, and still
-  not a three-model comparison.
+- **All three models are real** as of v3 (2026-08-24) — but only when each is configured with
+  a worker. In default fixture mode every panel is still a hash of the prompt, and the
+  triptych's banner, which builds itself from `/health`, says which case you are looking at.
+- **Language of Motion barely travels.** "A person walks forward and turns around" moves its
+  pelvis 0.09 m, against Kimodo's 2.11 m and SnapMoGen's 3.89 m on the same phrase. Real
+  motion, real articulation — the wrists span 0.46–0.63 m — but almost no root translation.
+  An observation from three prompts, not a result, and recorded in
+  [`docs/v3-models.md`](docs/v3-models.md).
+- **Language of Motion answers a 5 s request with ~27 s of motion**, which the worker
+  truncates. It has no length conditioning on the released checkpoint, and the triptych says
+  `asked 150 frames, moved 800` rather than cropping quietly.
 - **A motion served from the store is the same generation, not a fast one.** Its telemetry
   reads `memory · remembered · not regenerated`, and the seconds beside it are the original
   run's — never refreshed into a claim about how quick the model is.

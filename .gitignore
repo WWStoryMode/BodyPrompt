@@ -29,3 +29,8 @@ service/.motions/
 # which is not this repository's to redistribute. See the README in that directory.
 inference/snapmogen-worker/checkpoints/*
 !inference/snapmogen-worker/checkpoints/README.md
+
+# Language of Motion's weights are Apache-2.0 and freely downloadable, but they are 2 GB;
+# the SMPL-X body model beside them is MPI-licensed and not ours to redistribute at all.
+inference/language-of-motion-worker/checkpoints/*
+!inference/language-of-motion-worker/checkpoints/README.md
