@@ -249,6 +249,9 @@ class StubGenerator(Generator):
             "inference_ms": 0,
             "post_processing": None,
             "denoising_steps": None,
+            # This path loops each fixture to fill the line, so it does honour the length.
+            "frames_asked": len(frames),
+            "frames_used": len(frames),
             # No model stitched this. `segments` says it is a poem; this says nothing
             # generated it, so it can never be mistaken for a real continuous reading.
             "multi_prompt": None,
@@ -302,6 +305,13 @@ class StubGenerator(Generator):
             "inference_ms": 0,
             "post_processing": None,  # nothing ran, so there was nothing to clean up
             "denoising_steps": None,  # a fixture has no noise schedule to walk
+            # A fixture is whatever length it was authored at and does not resize to the
+            # requested duration. That used to be invisible: the triptych would show a
+            # fixture panel a third longer than the others with nothing on screen saying
+            # why. A model that will not move for as long as it was asked to has to say so,
+            # and so does something standing in for one.
+            "frames_asked": round(duration_seconds * int(base["fps"])),
+            "frames_used": len(motion["frames"]),
         }
 
         # The ghost-cloud: siblings of this motion, one per extra seed. Seeds are derived

@@ -173,7 +173,7 @@ in front of an audience:
 | **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
-| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; the poem is kept; Language of Motion still a fixture |
+| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; the poem is kept; the triptych reads a whole poem; Language of Motion still a fixture |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
@@ -223,10 +223,13 @@ quietly half-built.
   but that is reasoning from Kimodo's structure, **not something measured**. If it holds, a
   re-bake could reuse them and the cost of an edit would fall to the lines that actually
   changed. Measuring it is the first step, not optimising.
-- **A poem in the triptych.** The multi-model comparison still takes one prompt, as it did
-  when the instrument was a tree. Comparing how three models carry a *whole poem* — where
-  each one loses the thread between sentences — is a different and probably better question
-  than comparing three single phrases. Waits on the other two models being real.
+- ~~**A poem in the triptych.**~~ **Done in v3 (2026-08-24).** <kbd>N</kbd> in the triptych
+  switches between one line and the whole poem. The answer to "what should a panel do for a
+  model that cannot stitch a poem" is **each model at its best, labelled**: Kimodo carries
+  each line into the next, SnapMoGen and the fixtures generate their lines apart, and every
+  panel says which it did. Forcing them into a common shape would have switched off the only
+  real continuity in the system to make the columns match — the asymmetry *is* the
+  comparison.
 
 **Deliberately not doing** — recorded so it is not mistaken for an oversight:
 
@@ -406,6 +409,7 @@ room. <http://localhost:5173/?perform=1> boots straight into it, for plugging in
 |---|---|
 | <kbd>R</kbd> | read the four notation registers |
 | <kbd>C</kbd> | compare models (the triptych) |
+| <kbd>N</kbd> | one line / the whole poem — in the triptych, or in the registers |
 | <kbd>P</kbd> | enter / leave performance mode |
 | <kbd>space</kbd> | play / pause |
 | <kbd>T</kbd> | cycle tempo (0.5× → 0.25× → 1×) |
@@ -445,6 +449,9 @@ keeping its native way of authoring) and **performance mode** (the projectable s
 - **A motion served from the store is the same generation, not a fast one.** Its telemetry
   reads `memory · remembered · not regenerated`, and the seconds beside it are the original
   run's — never refreshed into a claim about how quick the model is.
+- **In the triptych's whole-poem scope the three panels are not the same kind of thing.**
+  One is continuous and two are lines laid end to end. Each panel says which, and a
+  screenshot without those labels is not a model comparison.
 - **Both real models move far less for a poetic prompt than a literal one.** "a body
   remembers a place it cannot return to" gets a 0.03 m wrist span from SnapMoGen and 0.18 m
   from Kimodo; "A person walks forward and turns around" gets 3.95 m and 2.38 m. SnapMoGen is

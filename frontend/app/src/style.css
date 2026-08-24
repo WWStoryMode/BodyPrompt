@@ -531,17 +531,60 @@ html, body {
   border-radius: 999px;
   padding: 3px 9px;
 }
+.tri-phrase {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.tri-line {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  padding: 7px 14px 0;
+  min-height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tri-line b { color: var(--accent); font-weight: 600; }
+
 .tri-stage { flex: 1; min-height: 0; position: relative; }
 .tri-stage canvas { display: block; }
 .tri-foot {
   font-family: var(--mono);
   font-size: 10.5px;
+  line-height: 1.6;
   color: var(--ink-faint);
   padding: 9px 14px;
   border-top: 1px solid var(--line);
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+/* What KIND of thing this panel is — carried through, or generated apart. In whole-poem
+   mode the three panels are not the same kind of thing, and this is the line that says so. */
+.tri-foot b { color: var(--ink-dim); font-weight: 600; }
+.tri-foot .apart { color: #df8a7d; }   /* the same red the stale-bake banner uses */
+.tri-foot .note { display: block; opacity: 0.75; }
+
+.tri-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.tri-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 /* one colour per model — the same coding as the mockups */

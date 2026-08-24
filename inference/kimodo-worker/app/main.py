@@ -322,6 +322,11 @@ def health() -> dict:
             "ready": cuda and load_error is None and get_model.cache_info().currsize == 1,
             "cuda": cuda,
             "model_version": MODEL_VERSION,
+            # A CAPABILITY, not a record of anything that happened. `multi_prompt` on a
+            # motion says what this worker did to that motion; this says what it is able
+            # to do at all, so a caller can decide how to ask before it asks. Kimodo can:
+            # `_multiprompt` conditions each line on the decoded tail of the one before it.
+            "can_stitch_poems": True,
             "text_encoder_device": os.environ.get("TEXT_ENCODER_DEVICE", "cuda"),
             "text_embedding_cache": EMBEDDING_CACHE_STATE,
             "error": load_error,

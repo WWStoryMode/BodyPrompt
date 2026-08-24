@@ -432,3 +432,138 @@ reachable from the API — `GET /motions` lists what is kept, and re-issuing a r
 seed replays it — and wiring a UI affordance onto that belongs with the triptych in Stage D,
 where showing a stored panel beside a live one is the thing that needs it. Saying so here is
 cheaper than a screen that implies a feature nobody can reach.
+
+---
+
+### 2026-08-24 — Stage D, the triptych takes a poem
+
+Stage B left a question open and said so out loud: *what should the triptych do with a poem
+when only one model can stitch one?* It called it a design question before a code one, and
+it was. The answer taken is **each model at its best, labelled**.
+
+#### The asymmetry is the finding
+
+Kimodo's `_multiprompt` conditions each line on the decoded tail of the line before it, so
+its poem is genuinely one continuous motion. SnapMoGen has no equivalent and its worker
+refuses a poem outright. Language of Motion is still a fixture.
+
+The alternative was to force everyone to concatenate, so the three columns would be the same
+kind of thing. That is a fairer comparison of *interpretation* and it throws away the most
+interesting thing in the system: it would switch off the one real capability any of these
+models has, to make a table look tidy. **Which model can carry a body from one sentence into
+the next is itself the comparison**, and it is close to what the README's parked item
+actually asked.
+
+So a model that can stitch is sent the poem; a model that cannot is sent its lines one at a
+time and the panel plays them as separate clips — seams visible, nothing interpolated, no
+pelvis slid across a join to disguise it. That is deliberately the bench's drafted-poem
+behaviour, using deliberately the same words, because it is the same claim.
+
+#### Asked by capability, labelled by provenance
+
+A new `/health` field, `can_stitch_poems`, says whether a poem may be sent to a model at
+all. It is a **capability**, and it is carefully not the same thing as `multi_prompt`, which
+is a record of what a worker did to one motion. The rule, now pinned by tests:
+
+> **Ask using the capability. Label using the provenance.**
+
+A model that declared it could stitch and then returned unstitched lines is labelled by what
+it did. And `null` — a worker that never answered — is asked line by line rather than sent a
+poem on a guess: null is not false, but it is not true either, and line-by-line is the
+request every model can answer.
+
+The decision lives in `frontend/app/src/triptych.ts`, out of the DOM and under test, for the
+same reason `register-view.ts` and `session.ts` do. The triptych is the one view whose entire
+purpose is comparison, so a panel that overstates its model does not merely mislabel a clip —
+it manufactures a finding.
+
+#### Measured: one poem, three panels
+
+Three lines, 2 s each — 180 frames if honoured exactly:
+
+| panel | continuity | frames | note |
+|---|---|---|---|
+| Kimodo | **3 lines carried through** | 180 (6.0 s) | exactly what was asked |
+| SnapMoGen | 3 lines generated apart | 384 (12.8 s) | asked 180, moved 384 |
+| Language of Motion | 3 lines generated apart | 270 (9.0 s) | asked 180, moved 270 · fixture |
+
+SnapMoGen more than doubles the poem's length because each 2 s line is below its 128-frame
+floor. The fixture is a third long because **a fixture does not resize to a requested
+duration at all** — which was previously invisible, a panel a third longer than its
+neighbours with nothing on screen saying why. Both now report `frames_asked` and
+`frames_used`, and the panel states the two numbers rather than diagnosing a cause it cannot
+know.
+
+The note has a **half-second threshold**, and the threshold is the point: SnapMoGen quantises
+to whole units, so a 5 s line comes back as 152 frames instead of 150. Reporting that in
+every panel would bury the case that actually matters under a rounding artefact.
+
+#### A stale banner, and why it was stale
+
+The triptych's honesty banner was hard-coded HTML. It read *"SnapMoGen and Language of Motion
+remain labeled fixtures"* — and had done for the entire commit in which SnapMoGen stopped
+being one. Stage B updated the README and `v0-stub.md` and missed it, because nothing in
+TypeScript touched it and nothing could fail.
+
+It is now built from `/health` on every capability refresh, so it says how many of the three
+panels are model output and, in poem scope, which models carry a line into the next. A claim
+about what is real has to come from the thing that knows.
+
+This is the second time a hard-coded claim has drifted past the code in this repository. The
+rule it suggests is worth stating: **a sentence about what the system is must be rendered
+from the system, not typed next to it.**
+
+#### Cost is asked for, never triggered
+
+Switching to whole-poem scope does **not** generate. Every line through every model, with
+each local worker gated to one at a time, is minutes of GPU; a toggle that spent it would be
+a trap. The panels clear and say `press D to read N lines in three models`. One-line scope
+still answers the moment the view opens, because it is cheap.
+
+`N` toggles whichever scope is on screen — the triptych's when comparing, the registers'
+otherwise.
+
+#### The transport was reporting the wrong body
+
+Found by using it. The transport **controlled** the triptych — play/pause and the scrub bar
+both drove all three panels — but **reported the bench**: the counter and the scrub position
+came from the hidden bench renderer, which is usually holding a different motion entirely.
+With nothing generated on the bench it never emitted at all, so the counter sat blank and the
+scrub frozen while three panels visibly played.
+
+There is no shared clock to report instead. A three-line poem is 180 frames of Kimodo and 384
+of SnapMoGen, so any frame count is one panel's clock presented as everyone's. What *is*
+shared is the **line**: every panel has the same number of them, in the same order. So while
+comparing, the transport reads `kimodo · line 2/3 · 48%` — a percentage, a line, and **whose
+playhead it is**. The lead panel prefers a real model over a fixture, because a
+hand-authored clip's length is an authoring decision and should not put a fixture's clock in
+charge of two models.
+
+Each panel also names the sentence its own body is answering, separately, because in poem
+scope they genuinely diverge: SnapMoGen floors every line to the same length while Kimodo
+honours the durations it was given, so halfway through a poem the two panels can be on
+different sentences. One line number across all three would be inventing an agreement they
+do not have.
+
+The bench's counter gained the same line number — `line 2/5 · frame 200 / 449 · 30 fps`.
+
+Two smaller faults went with it. Play/pause **toggled each renderer from its own state**, so
+a panel that had nothing loaded when the others started would flip to playing exactly when
+they stopped; it now sets one state across everything on screen, read from whichever
+renderer the transport is reporting, so the button and the counter cannot disagree. And
+closing the triptych over a paused bench left a panel's reading on the transport, describing
+a body no longer on screen — the bench's last position is now kept and restored on close,
+because a renderer only emits while something is moving.
+
+#### `D` did not do what the screen said
+
+The same session found a plainer bug: `D` called `draftLine` directly instead of going
+through `draftHere`, so the key never drove the triptych — only the button did. Harmless
+while the triptych always generated on open; fatal once poem scope deliberately waits and
+puts *press D* on screen, because D was drafting a bench line behind the hidden stage and the
+panels stayed blank.
+
+Both keys now route through one path, `B` in the triptych means the whole poem, and the two
+bar buttons relabel to **Ask all three** / **Whole poem** so the instruction on screen names
+a control that exists. A triptych generation also takes the busy guard the bench has always
+had: three models on one line only wasted seconds, but a whole poem is minutes.

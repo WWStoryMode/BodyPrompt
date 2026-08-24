@@ -652,3 +652,83 @@ def test_the_listing_says_what_is_remembered_without_returning_it(tmp_path):
     assert "frames" not in entry or isinstance(entry["frames"], int)
     assert entry["generated_at"]
     assert "positions" not in json.dumps(entry)  # metadata only, never the motion
+
+
+# ---------------------------------------------------------------------------
+# Whether a model can be sent a poem at all — v3 Stage D.
+#
+# `multi_prompt` on a motion says what a worker DID to that motion. `can_stitch_poems` in
+# /health says what a worker CAN do, so a caller can ask the right way round instead of
+# discovering a refusal by failing. These are different claims and the tests keep them so.
+# ---------------------------------------------------------------------------
+
+
+def test_a_worker_declares_whether_a_poem_may_be_sent_to_it():
+    stitcher = worker()
+    stitcher._json = lambda path, payload=None: {
+        "ready": True, "model_version": "Kimodo-SOMA-RP-v1.1", "can_stitch_poems": True
+    }
+    assert stitcher.describe()["can_stitch_poems"] is True
+
+    single = WorkerProvider("snapmogen", "http://worker.test:8011")
+    single._json = lambda path, payload=None: {
+        "ready": True, "model_version": "SnapMoGen-MoMaskPlus", "can_stitch_poems": False
+    }
+    assert single.describe()["can_stitch_poems"] is False
+
+
+def test_a_worker_that_says_nothing_is_reported_as_unknown_not_as_no():
+    """None is not False. Rendering "we were not told" as "it cannot" puts a claim on
+    screen that nobody made."""
+    provider = worker()
+    provider._json = lambda path, payload=None: {"ready": True, "model_version": "x"}
+
+    assert provider.describe()["can_stitch_poems"] is None
+
+
+def test_a_worker_that_is_down_does_not_invent_a_capability():
+    provider = worker()
+
+    def refuse(path, payload=None):
+        raise RuntimeError("worker unavailable")
+
+    provider._json = refuse
+    described = provider.describe()
+
+    assert described["ready"] is False
+    assert described["can_stitch_poems"] is None
+
+
+def test_the_fixtures_do_not_claim_to_stitch_a_poem():
+    """The stub lays fixtures end to end and slides the pelvis to match — a translation,
+    not a transition. Its motions already say `multi_prompt: null`; the capability agrees."""
+    described = FixtureProvider("snapmogen", StubGenerator()).describe()
+
+    assert described["can_stitch_poems"] is False
+
+
+def test_the_length_the_model_used_is_recorded_beside_what_it_was_asked_for():
+    """SnapMoGen will not go below its own floor, so a 2 s line comes back as 4.27 s. Two
+    triptych panels of different lengths for one poem is a fact about the models."""
+    provider = worker()
+    worker_motion = StubGenerator().generate("kimodo", "move")
+    worker_motion["frames_asked"] = 60
+    worker_motion["frames_used"] = 128
+
+    provider._json = lambda path, payload=None: worker_motion
+    motion = provider.generate(GenerationRequest(model="kimodo", prompt="move"))
+
+    assert motion["provenance"]["frames_asked"] == 60
+    assert motion["provenance"]["frames_used"] == 128
+    # What the worker did belongs in provenance, never loose beside the motion.
+    assert "frames_asked" not in motion
+    assert "frames_used" not in motion
+
+
+def test_health_says_which_models_a_poem_may_be_sent_to(monkeypatch):
+    router = build(monkeypatch, BODYPROMPT_MODEL_SNAPMOGEN="fixture")
+    capabilities = {item["model"]: item for item in router.capabilities()}
+
+    assert capabilities["snapmogen"]["can_stitch_poems"] is False
+    # Every model reports the field, so the frontend never has to guess from a gap.
+    assert all("can_stitch_poems" in item for item in router.capabilities())

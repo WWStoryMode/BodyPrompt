@@ -86,10 +86,15 @@ the triptych, **the visible difference between "SnapMoGen" and "Kimodo" is nothi
 noise applied to one identical fixture.** The remaining panel differs only because a modulo
 landed elsewhere.
 
-The triptych carries an in-UI banner saying the differences are a stub artefact. That banner
-is doing heavy lifting, and it is not overstating the case. **Nothing in that view can be read
-as a finding about model behaviour.** Do not put a triptych screenshot in a paper as evidence
-of models interpreting a theme.
+The triptych carries an in-UI banner saying so. **As of v3 that banner is built from
+`/health`** rather than written into the page, so it counts the real panels instead of
+asserting a number — the hard-coded version it replaced still said "SnapMoGen and Language of
+Motion remain labeled fixtures" for the whole of the commit in which SnapMoGen stopped being
+one. In fixture mode it still says what this section says, and it is not overstating the case.
+
+**In fixture mode, nothing in that view can be read as a finding about model behaviour.** Do
+not put a triptych screenshot in a paper as evidence of models interpreting a theme without
+reading its banner and its per-panel labels first.
 
 ## Fake #3 — the ghost-cloud is a perturbation, not a sampling
 

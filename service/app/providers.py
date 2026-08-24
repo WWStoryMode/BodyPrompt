@@ -84,6 +84,7 @@ class ModelProvider(Protocol):
     def ready(self) -> bool: ...
 
     def describe(self) -> dict: ...
+    """Includes `can_stitch_poems`: whether a poem may be sent to this model at all."""
 
     def generate(self, req: GenerationRequest) -> dict: ...
 
@@ -144,6 +145,11 @@ class WorkerProvider:
         # here, for the same reason as everything else in provenance: this file does not
         # know which checkpoint is loaded on the far side, and guessing would be a claim.
         self._model_version: str | None = None
+        # Whether this model can generate a poem as ONE continuous motion, each line
+        # conditioned on the body the line before it left. A capability, learned the same
+        # way and for the same reason — and `None` until a worker has answered, which is
+        # not the same as False and must not be rendered as one.
+        self._can_stitch_poems: bool | None = None
 
     # ---- transport ----------------------------------------------------------
 
@@ -175,6 +181,9 @@ class WorkerProvider:
         version = health.get("model_version")
         if isinstance(version, str) and version:
             self._model_version = version
+        stitches = health.get("can_stitch_poems")
+        if isinstance(stitches, bool):
+            self._can_stitch_poems = stitches
         return health
 
     # ---- the contract -------------------------------------------------------
@@ -192,6 +201,10 @@ class WorkerProvider:
             "ready": self.ready(),
             "hosting": self.hosting,
             "model_version": self._model_version,
+            # None means "this worker has not told us". A caller that sends a poem on a
+            # None will get an honest refusal from the worker; a caller that renders None
+            # as False would be putting a claim on screen that nobody made.
+            "can_stitch_poems": self._can_stitch_poems,
         }
 
     def generate(self, req: GenerationRequest) -> dict:
@@ -240,6 +253,14 @@ class WorkerProvider:
             # poem from lines merely laid end to end.
             "multi_prompt": motion.pop("multi_prompt", None),
             "transition_frames": motion.pop("transition_frames", None),
+            # How long the model was asked to move for, and how long it actually did.
+            # SnapMoGen quantises to whole units and will not go below its own floor, so a
+            # 2 s line comes back as 4.27 s of motion. That belongs with everything else
+            # the worker DID rather than loose beside the motion, and the triptych needs
+            # it: two panels of different lengths for one poem is a fact about the models,
+            # not a glitch.
+            "frames_asked": motion.pop("frames_asked", None),
+            "frames_used": motion.pop("frames_used", None),
         }
         return motion
 
@@ -280,6 +301,10 @@ class FixtureProvider:
             "ready": self.ready(),
             "hosting": self.hosting,
             "model_version": "bodyprompt-fixtures/v0",
+            # The stub's poem is fixtures laid end to end with the pelvis slid to match —
+            # a translation, not a transition, and its motions say `multi_prompt: null`
+            # precisely so nothing reads them as continuous. So: no.
+            "can_stitch_poems": False,
         }
 
     def generate(self, req: GenerationRequest) -> dict:

@@ -47,7 +47,7 @@ hunting for a mouse in front of an audience.
 | <kbd>D</kbd> | **Draft** the selected line, on its own |
 | <kbd>B</kbd> | **Bake** the whole poem in one pass |
 | <kbd>L</kbd> | loop the selected line alone / release it |
-| <kbd>N</kbd> | registers read **one line** / the **whole poem** |
+| <kbd>N</kbd> | **one line** / the **whole poem** — the triptych's scope when comparing, the registers' otherwise |
 | <kbd>R</kbd> | **Read** — open / close the four notation registers |
 | <kbd>C</kbd> | **Compare** — open / close the multi-model triptych |
 | <kbd>P</kbd> | **Perform** — enter / leave performance mode |
@@ -262,16 +262,65 @@ model **snapmogen**, the phrase "slip away" does it. (Yes, really. That is fake 
 
 ## The triptych — <kbd>C</kbd>
 
-One prompt, three models, side by side: SnapMoGen, Language of Motion, Kimodo. Each keeps its
-**native way of authoring** — write / voice / sculpt — because the difference in *how you
-author* is itself part of the research. (Only *write* is wired up; the others are labelled, not
-built.) Each panel has its own accent colour, and all three play in step — comparing motions
-that were out of step with each other would tell you nothing.
+Three models side by side: SnapMoGen, Language of Motion, Kimodo. Each keeps its **native way
+of authoring** — write / voice / sculpt — because the difference in *how you author* is itself
+part of the research. (Only *write* is wired up; the others are labelled, not built.) Each
+panel has its own accent colour, and all three play in step.
 
-> ⚠️ **The three models differ only because the stub hashes `(model, prompt)`.** They are not
-> three models interpreting a theme. In fact two of the three panels usually show the *same*
-> base fixture wearing different seeded jitter. There is a banner in the UI saying so, and it
-> is not being coy. **Do not use a triptych screenshot as evidence of model comparison.**
+The banner at the top is **built from `/health`**, not written into the page, so it always
+says how many of the three panels are actually model output. As of v3 that is two of three —
+Language of Motion is still a hand-authored fixture and its panel says so.
+
+### One line, or the whole poem — <kbd>N</kbd>
+
+The scope button at the top right switches between two genuinely different questions.
+
+**One line** — how do three models read the same sentence? This is the original triptych. It
+generates the moment you open the view, because one line is cheap.
+
+**The whole poem** — which of these models can carry a body from one sentence into the next
+at all? This one **waits to be asked**: every line through every model, with each local
+worker serialised to one generation at a time, is minutes of GPU, so the panels clear and say
+`press D to read N lines in three models`. Press <kbd>D</kbd> when you mean it.
+
+In whole-poem scope the three panels are **not the same kind of thing**, and each one says
+which it is:
+
+- `3 lines carried through` — the model generated the poem as one motion, each line
+  conditioned on the body the line before it left. Only Kimodo can do this.
+- `3 lines generated apart` — the lines were generated separately and laid end to end. The
+  body jumps between them, and nothing smooths it: no interpolation, no pelvis slid across
+  a join. It is the same thing a drafted poem is on the bench, and it is labelled with the
+  same words on purpose.
+
+Nothing is forced into a common shape to make the columns match. Making Kimodo concatenate
+too would be a fairer comparison of *interpretation*, and it would switch off the only real
+continuity in the system to do it. The asymmetry **is** the comparison.
+
+A panel may also say `asked for 180 frames, moved for 384`. That is the model declining the
+length it was given — SnapMoGen will not go below a 128-frame floor, so a 2 s line becomes
+4.27 s of movement, and a fixture does not resize to a requested duration at all. Small
+differences are not reported: SnapMoGen quantises to whole units, so 150 frames becoming 152
+is a rounding artefact and saying so in every panel would bury the case that matters.
+
+### The transport, while comparing
+
+Play/pause and the scrub bar drive all three panels together. The counter reads something
+like `kimodo · line 2/3 · 48%`, and the model name is not decoration — **there is no shared
+clock**. A three-line poem is 180 frames of Kimodo and 384 of SnapMoGen, so a frame count
+would be one panel's clock presented as everyone's. A percentage and a line number are what
+the panels actually have in common, and the name says whose playhead you are reading.
+
+Each panel separately names the sentence *its* body is on, because they diverge: SnapMoGen
+floors every line to the same length while Kimodo honours the durations it was given, so
+halfway through a poem two panels can be on different lines.
+
+On the bench the counter carries the line number too — `line 2/5 · frame 200 / 449 · 30 fps`.
+
+> ⚠️ **Read the labels before drawing a conclusion.** Two of three panels are real models;
+> the third is a fixture. In whole-poem scope one panel is continuous and two are not. A
+> screenshot of this view is not evidence of three models interpreting a theme, and the
+> per-panel labels are what make that checkable rather than something you have to remember.
 
 ---
 
