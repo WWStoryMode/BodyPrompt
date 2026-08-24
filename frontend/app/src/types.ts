@@ -69,6 +69,13 @@ export interface CanonicalMotion {
     multi_prompt?: boolean | null;
     /** Frames overlapped between lines. Null when this is not a stitched poem. */
     transition_frames?: number | null;
+    /**
+     * *v3.* How long the model was asked to move for, and how long it actually did.
+     * SnapMoGen quantises to whole units and will not go below its own floor, so a 2 s
+     * line comes back as 4.27 s of motion. Null for a model with no such constraint.
+     */
+    frames_asked?: number | null;
+    frames_used?: number | null;
   };
   /** True when the motion came from the v0 stub rather than a model. */
   stub?: boolean;

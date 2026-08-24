@@ -78,7 +78,7 @@ export class StickFigureRenderer {
   private timeline: TimelineEntry[] = [];
   private totalFrames = 0;
   private frameFloat = 0;
-  private playing = false;
+  private isPlaying = false;
   private listener?: FrameListener;
   private tempo = 1; // 0.5 = half speed — the performer needs time to read and follow
   private loopMode: LoopMode = "whole";
@@ -272,7 +272,7 @@ export class StickFigureRenderer {
    * which is the one thing this instrument may not do.
    */
   clear(): void {
-    this.playing = false;
+    this.isPlaying = false;
     for (const m of this.jointMeshes) this.scene.remove(m);
     this.jointMeshes = [];
     for (const ghosts of this.trailMeshes.values()) {
@@ -289,19 +289,24 @@ export class StickFigureRenderer {
     this.frameFloat = 0;
   }
 
+  /** Whether this renderer is running. Read so a caller can set ONE state across many. */
+  get playing(): boolean {
+    return this.isPlaying;
+  }
+
   play(): void {
     if (!this.motion) return;
-    this.playing = true;
+    this.isPlaying = true;
     this.emit();
   }
 
   pause(): void {
-    this.playing = false;
+    this.isPlaying = false;
     this.emit();
   }
 
   togglePlay(): void {
-    this.playing ? this.pause() : this.play();
+    this.isPlaying ? this.pause() : this.play();
   }
 
   /** Seek to a normalised position in [0, 1]. */
@@ -435,13 +440,13 @@ export class StickFigureRenderer {
     requestAnimationFrame(this.animate);
     const dt = this.clock.getDelta();
 
-    if (this.playing && this.motion && this.totalFrames > 0) {
+    if (this.isPlaying && this.motion && this.totalFrames > 0) {
       const [from, to] = this.loopBounds();
       this.frameFloat += dt * this.motion.fps * this.tempo;
       if (this.frameFloat > to) {
         if (this.loopMode === "none") {
           this.frameFloat = to;
-          this.playing = false;
+          this.isPlaying = false;
         } else {
           // Wrap into the looped span rather than to frame 0: looping one line has to come
           // back to that line's beginning, not the poem's.
@@ -472,7 +477,7 @@ export class StickFigureRenderer {
       frame: Math.round(this.frameFloat),
       total: this.totalFrames,
       fps: this.motion.fps,
-      playing: this.playing,
+      playing: this.isPlaying,
       segmentIndex: this.segmentIndex,
     });
   }

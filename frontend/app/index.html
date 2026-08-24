@@ -151,17 +151,29 @@
            the difference in how you author is itself part of the research.
            =================================================================== -->
       <div id="tri" class="tri">
-        <div class="tri-banner">
-          <b>mixed sources</b> — Kimodo is real only when the local GPU backend is ready.
-          SnapMoGen and Language of Motion remain labeled fixtures. This view is
-          <b>not evidence of cross-model interpretation</b>.
+        <!-- The scope, and the honesty banner. The banner is BUILT FROM /health, never
+             written here: a hard-coded one said "SnapMoGen and Language of Motion remain
+             labeled fixtures" for the whole of the commit in which SnapMoGen stopped being
+             one. A claim about what is real has to come from the thing that knows. -->
+        <div class="tri-bar">
+          <span id="tri-title" class="tri-title">one line · three models</span>
+          <!-- What is actually being compared. A comparison view that never names
+               its subject is asking the reader to remember it. -->
+          <span id="tri-phrase" class="tri-phrase"></span>
+          <button id="tri-scope" class="scope-btn" title="Compare the whole poem (N)">
+            one line
+          </button>
         </div>
+        <div id="tri-banner" class="tri-banner"></div>
         <div class="tri-cols">
           <div class="tri-col" data-model="snapmogen">
             <div class="tri-head">
               <span id="tri-name-snapmogen" class="tri-name">SnapMoGen · checking…</span>
               <span class="tri-mode">write</span>
             </div>
+            <!-- In poem scope: the sentence THIS panel's body is answering now.
+                 The panels can be on different lines at the same moment. -->
+            <div class="tri-line" id="tri-line-snapmogen"></div>
             <div class="tri-stage" id="tri-stage-snapmogen"></div>
             <div class="tri-foot" id="tri-foot-snapmogen">—</div>
           </div>
@@ -170,6 +182,9 @@
               <span id="tri-name-language-of-motion" class="tri-name">Language of Motion · checking…</span>
               <span class="tri-mode">voice</span>
             </div>
+            <!-- In poem scope: the sentence THIS panel's body is answering now.
+                 The panels can be on different lines at the same moment. -->
+            <div class="tri-line" id="tri-line-language-of-motion"></div>
             <div class="tri-stage" id="tri-stage-language-of-motion"></div>
             <div class="tri-foot" id="tri-foot-language-of-motion">—</div>
           </div>
@@ -178,6 +193,9 @@
               <span id="tri-name-kimodo" class="tri-name">Kimodo · checking…</span>
               <span class="tri-mode">sculpt</span>
             </div>
+            <!-- In poem scope: the sentence THIS panel's body is answering now.
+                 The panels can be on different lines at the same moment. -->
+            <div class="tri-line" id="tri-line-kimodo"></div>
             <div class="tri-stage" id="tri-stage-kimodo"></div>
             <div class="tri-foot" id="tri-foot-kimodo">—</div>
           </div>

@@ -22,6 +22,7 @@ import {
 import type { RegisterView } from "./notation";
 import type { CanonicalMotion } from "./types";
 import { openAutosave } from "./autosave";
+import { askFor, continuityLabel, readPanel } from "./triptych";
 import { fromSession, restore, sessionFilename, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -68,6 +69,10 @@ const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElem
 const appEl = $<HTMLDivElement>("app");
 const performEl = $<HTMLButtonElement>("perform");
 const triptychEl = $<HTMLButtonElement>("triptych");
+const triScopeEl = $<HTMLButtonElement>("tri-scope");
+const triTitleEl = $<HTMLSpanElement>("tri-title");
+const triPhraseEl = $<HTMLSpanElement>("tri-phrase");
+const triBannerEl = $<HTMLDivElement>("tri-banner");
 const registersBtnEl = $<HTMLButtonElement>("registers-btn");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
@@ -411,6 +416,34 @@ let userScrubbing = false;
 
 
 
+/** What the service says each model is. The backend, not this file, is the authority. */
+interface Capability {
+  model: string;
+  source: string;
+  ready: boolean;
+  hosting?: string;
+  model_version?: string | null;
+  /** Whether a poem may be sent to this model at all. `null` = the worker did not say. */
+  can_stitch_poems?: boolean | null;
+}
+
+const capabilities = new Map<string, Capability>();
+
+const MODEL_NAMES: Record<string, string> = {
+  kimodo: "Kimodo",
+  snapmogen: "SnapMoGen",
+  "language-of-motion": "Language of Motion",
+};
+
+/** A model's display name. An unrecognised id keeps its own name rather than borrowing one. */
+function modelName(id: string): string {
+  return MODEL_NAMES[id] ?? id;
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // ---- the triptych: one prompt, three models ----
 //
 // The models keep their NATIVE way of authoring — write / voice / sculpt — because the
@@ -429,49 +462,323 @@ const TRI_MODELS = [
 let comparing = false;
 const triRenderers = new Map<string, StickFigureRenderer>();
 
+/** The prompts the panels are playing, in order. One entry; or one per line of the poem. */
+let triPrompts: string[] = [];
+
+/**
+ * The panel whose playhead the transport reports — and it is **named on screen**.
+ *
+ * There is no shared clock to report. In poem scope the panels are different lengths (a
+ * three-line poem is 180 frames of Kimodo and 384 of SnapMoGen), so a frame count would be
+ * one panel's clock presented as everyone's. What IS shared is the line: every panel has
+ * the same number of them, in the same order. So the transport reads a percentage and a
+ * line, and says whose.
+ */
+let triLead: string | null = null;
+
 /** Renderers are built lazily — a WebGL context per panel is not free. */
 function triRenderer(modelId: string, accent: number): StickFigureRenderer {
   let r = triRenderers.get(modelId);
   if (!r) {
     const host = document.getElementById(`tri-stage-${modelId}`) as HTMLDivElement;
     r = new StickFigureRenderer(host, { accent, grid: false });
+    r.onFrame((info) => onTriFrame(modelId, info));
     triRenderers.set(modelId, r);
   }
   return r;
 }
 
-/** Ask all three models the same question, at once. */
-async function generateTriptych(): Promise<void> {
-  // One line, three models. The triptych compares models on a single phrase, so it takes
-  // the line being worked on rather than the whole poem.
+const lineEl = (id: string) => document.getElementById(`tri-line-${id}`) as HTMLDivElement;
+
+/**
+ * A panel moved. Say which sentence its body is answering, and — if this is the panel the
+ * transport is following — move the transport with it.
+ *
+ * Each panel reports its own line, because in poem scope they genuinely diverge: SnapMoGen
+ * floors every line to the same length while Kimodo honours the durations it was given, so
+ * halfway through the poem the two panels can be on different sentences. Showing one line
+ * number for all three would be inventing an agreement they do not have.
+ */
+function onTriFrame(
+  id: string,
+  info: { frame: number; total: number; playing: boolean; segmentIndex: number },
+): void {
+  const prompt = triPrompts[info.segmentIndex];
+  lineEl(id).innerHTML =
+    triPrompts.length > 1 && prompt
+      ? `<b>${info.segmentIndex + 1}</b> · ${escapeHtml(prompt)}`
+      : "";
+
+  if (id !== triLead) return;
+  playPauseEl.textContent = info.playing ? "Pause" : "Play";
+  const last = Math.max(1, info.total - 1);
+  const percent = Math.round((info.frame / last) * 100);
+  const where =
+    triPrompts.length > 1 ? `line ${info.segmentIndex + 1}/${triPrompts.length} · ` : "";
+  counterEl.textContent = `${modelName(id)} · ${where}${percent}%`;
+  if (!userScrubbing && info.total > 1) {
+    scrubEl.value = String(Math.round((info.frame / last) * 1000));
+  }
+}
+
+/**
+ * Which panel the transport follows.
+ *
+ * A real model in preference to a fixture: a hand-authored clip's length is an authoring
+ * decision, and letting it drive the scrub bar would put a fixture's clock in charge of two
+ * models. Named in the counter either way, so the choice is never silent.
+ */
+function chooseTriLead(loaded: Set<string>): void {
+  const real = TRI_MODELS.find(
+    (m) => loaded.has(m.id) && capabilities.get(m.id)?.source !== "fixture",
+  );
+  triLead = (real ?? TRI_MODELS.find((m) => loaded.has(m.id)))?.id ?? null;
+}
+
+/**
+ * What the triptych is comparing: one line, or the whole poem.
+ *
+ * These are two different questions. **One line** asks how three models read the same
+ * sentence. **The whole poem** asks something the instrument has never been able to ask:
+ * which of them can carry a body from one sentence into the next at all.
+ */
+type TriScope = "line" | "poem";
+let triScope: TriScope = "line";
+
+const foot = (id: string) => document.getElementById(`tri-foot-${id}`) as HTMLDivElement;
+
+/**
+ * What a panel actually is, drawn in the panel.
+ *
+ * The decision behind this lives in `triptych.ts`, out of the DOM and under test, because
+ * it is the claim the whole view rests on: in whole-poem mode the three panels are **not
+ * the same kind of thing**, and a screen that let that pass would be a capability
+ * comparison wearing a model comparison's clothes.
+ */
+function triFoot(clips: CanonicalMotion[], lines: number): string {
+  const reading = readPanel(clips, lines);
+  const label = continuityLabel(reading);
+  const claim = label
+    ? `<b class="${reading.continuity === "apart" ? "apart" : ""}">${label}</b>`
+    : `seed ${escapeHtml(clips[0].seed)}`;
+  // Stated as two numbers rather than as a diagnosis. SnapMoGen is held to a length floor;
+  // a fixture simply is whatever length it was authored at. The fact is the same and the
+  // panel is not the place to guess which.
+  const stretched = reading.lengthened
+    ? `<span class="note">asked for ${reading.framesAsked} frames, moved for ` +
+      `${reading.framesUsed}</span>`
+    : "";
+  return `${claim} · ${reading.frames} frames · ${escapeHtml(reading.source)}${stretched}`;
+}
+
+/** Ask the three models one line. */
+async function generateTriptychLine(): Promise<void> {
+  // The line being worked on, not the whole poem — that is what the poem scope is for.
   const prompt = poem.selected?.text.trim() || poem.written[0]?.text.trim() || "";
+  if (!prompt) return;
+  triPrompts = [prompt];
+  triPhraseEl.textContent = `“${prompt}”`;
+  const loaded = new Set<string>();
   await Promise.all(
     TRI_MODELS.map(async ({ id, accent }) => {
-      const footEl = document.getElementById(`tri-foot-${id}`) as HTMLDivElement;
       const r = triRenderer(id, accent);
+      foot(id).textContent = "generating…";
       try {
-        const res = await fetch(`${API_BASE}/generate`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            model: id,
-            prompt,
-            variants: 1,
-            duration_seconds: Number(durationEl.value),
-            denoising_steps: chosenSteps(),
-          }),
+        const motion = await post({
+          model: id,
+          prompt,
+          variants: 1,
+          duration_seconds: Number(durationEl.value),
+          denoising_steps: chosenSteps(),
         });
-        if (!res.ok) throw new Error(await responseError(res));
-        const motion = (await res.json()) as CanonicalMotion;
         r.load(motion);
-        footEl.textContent =
-          `seed ${motion.seed} · ${motion.frames.length} frames · ` +
-          `${motion.provenance?.source ?? (motion.stub ? "fixture" : "unknown")}`;
+        loaded.add(id);
+        foot(id).innerHTML = triFoot([motion], 1);
       } catch (err) {
-        footEl.textContent = `error: ${(err as Error).message}`;
+        foot(id).textContent = `error: ${(err as Error).message}`;
       }
     }),
   );
+  chooseTriLead(loaded);
+}
+
+/**
+ * Ask the three models the whole poem — each at its best, and each saying what it did.
+ *
+ * A model that can stitch is sent the poem as a poem. A model that cannot is sent its lines
+ * one at a time and the panel plays them as separate clips: seams visible, nothing
+ * interpolated, no pelvis slid across a join to disguise it. That is deliberately the
+ * bench's drafted-poem behaviour, because it is deliberately the same claim.
+ *
+ * Which way round to ask is read from `/health`, not discovered by failing: a worker that
+ * cannot stitch declares `can_stitch_poems: false`, and SnapMoGen's refuses a poem outright.
+ */
+async function generateTriptychPoem(): Promise<void> {
+  const lines = poem.toLines();
+  if (!lines.length) return;
+  triPrompts = lines.map((line) => line.prompt);
+  triPhraseEl.textContent = `${lines.length} lines`;
+  const loaded = new Set<string>();
+  await Promise.all(
+    TRI_MODELS.map(async ({ id, accent }) => {
+      const r = triRenderer(id, accent);
+      const whole = askFor(capabilities.get(id)) === "whole";
+      foot(id).textContent = whole
+        ? `generating ${lines.length} lines as one…`
+        : `generating ${lines.length} lines, one at a time…`;
+      try {
+        // Both branches fire everything at once. How much actually runs in parallel is the
+        // service's business, not the browser's — a local worker is gated to one at a time
+        // there, which is exactly the split Stage A existed to make.
+        const clips = whole
+          ? [await post({ model: id, lines, denoising_steps: chosenSteps() })]
+          : await Promise.all(
+              lines.map((line) =>
+                post({
+                  model: id,
+                  prompt: line.prompt,
+                  variants: 1,
+                  duration_seconds: line.duration_seconds,
+                  denoising_steps: chosenSteps(),
+                }),
+              ),
+            );
+        r.loadSequence(clips);
+        loaded.add(id);
+        foot(id).innerHTML = triFoot(clips, lines.length);
+      } catch (err) {
+        foot(id).textContent = `error: ${(err as Error).message}`;
+      }
+    }),
+  );
+  chooseTriLead(loaded);
+}
+
+// One triptych generation at a time. The bench has always guarded this through
+// `setGenerating`; the triptych never did, because a single line across three models was
+// cheap enough that a double-press only wasted seconds. A whole poem is every line through
+// every model with each local worker serialised to one at a time — minutes — so a second
+// press while the first is still running has to be refused rather than queued.
+let triBusy = false;
+
+/** Ask all three models the same question, at once. */
+async function generateTriptych(): Promise<void> {
+  if (triBusy) return;
+  triBusy = true;
+  const started = performance.now();
+  setGenerating(
+    true,
+    triScope === "poem" ? "reading the poem in three models…" : "asking three models…",
+  );
+  try {
+    await (triScope === "poem" ? generateTriptychPoem() : generateTriptychLine());
+    generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
+  } finally {
+    triBusy = false;
+    // Restores the buttons; the panels own their own errors, one per model, because two of
+    // three succeeding is the normal case here and a single banner would flatten it.
+    generateEl.disabled = false;
+    bakeEl.disabled = false;
+  }
+}
+
+/**
+ * Say what these three panels are, from what the service reports rather than from a
+ * sentence typed into the HTML.
+ *
+ * The hard-coded banner this replaces claimed "SnapMoGen and Language of Motion remain
+ * labeled fixtures" for the whole of the commit in which SnapMoGen stopped being one. A
+ * claim about what is real must come from the thing that knows it.
+ */
+function updateTriptychBanner(): void {
+  const known = TRI_MODELS.map(({ id }) => capabilities.get(id)).filter(Boolean);
+  const fixtures = known.filter((c) => c!.source === "fixture").map((c) => modelName(c!.model));
+  const parts: string[] = [];
+
+  if (!known.length) {
+    parts.push("<b>checking</b> — the service has not said yet what any of these are.");
+  } else if (fixtures.length === TRI_MODELS.length) {
+    parts.push(
+      "<b>no models here</b> — all three panels are hand-authored fixtures chosen by " +
+        "hashing the prompt. The differences between them are an artefact of hashing and " +
+        "are <b>not evidence of anything</b>.",
+    );
+  } else if (fixtures.length) {
+    parts.push(
+      `<b>mixed sources</b> — ${fixtures.join(" and ")} ` +
+        `${fixtures.length === 1 ? "is a" : "are"} hand-authored ` +
+        `${fixtures.length === 1 ? "fixture" : "fixtures"}, not model output. ` +
+        `This is <b>${TRI_MODELS.length - fixtures.length} of ${TRI_MODELS.length}</b> ` +
+        "panels comparing models.",
+    );
+  } else {
+    parts.push("<b>three models</b> — every panel is real model output.");
+  }
+
+  if (triScope === "poem") {
+    const stitchers = known
+      .filter((c) => c!.can_stitch_poems === true)
+      .map((c) => modelName(c!.model));
+    parts.push(
+      stitchers.length
+        ? `Reading the whole poem. <b>${stitchers.join(" and ")}</b> ` +
+            `${stitchers.length === 1 ? "carries" : "carry"} each line into the next; the ` +
+            "others generate their lines apart. <b>The panels are not the same kind of " +
+            "thing</b> — each one says which it is."
+        : "Reading the whole poem. <b>None of these models can carry one line into the " +
+            "next</b>, so every panel is lines generated apart.",
+    );
+  }
+
+  triBannerEl.innerHTML = parts.join(" ");
+}
+
+function setTriScope(scope: TriScope): void {
+  triScope = scope;
+  triScopeEl.textContent = scope === "poem" ? "whole poem" : "one line";
+  triScopeEl.classList.toggle("on", scope === "poem");
+  triTitleEl.textContent =
+    scope === "poem" ? "the whole poem · three models" : "one line · three models";
+  updateTriptychBanner();
+  if (comparing) modePillEl.textContent = triptychPill();
+
+  // Switching scope does NOT generate. A whole-poem triptych is every line through every
+  // model, with each local worker serialised to one at a time — minutes of GPU. That is
+  // asked for deliberately, never triggered by a toggle.
+  const waiting =
+    scope === "poem"
+      ? `press D — or “Ask all three” — to read ${poem.written.length} lines here`
+      : "press D to ask all three";
+  triPrompts = [];
+  triLead = null;
+  triPhraseEl.textContent =
+    scope === "poem" ? `${poem.written.length} lines, not yet read` : "";
+  counterEl.textContent = "";
+  scrubEl.value = "0";
+  playPauseEl.textContent = "Play";
+  for (const { id } of TRI_MODELS) {
+    triRenderers.get(id)?.clear();
+    lineEl(id).textContent = "";
+    foot(id).textContent = waiting;
+  }
+}
+
+/** What the two generate buttons are called, for whichever instrument is open. */
+function setBarLabels(): void {
+  generateEl.textContent = comparing ? "Ask all three" : "Draft line";
+  generateEl.title = comparing
+    ? "Ask all three models (D)"
+    : "Generate the selected line alone (D)";
+  bakeEl.textContent = comparing ? "Whole poem" : "Bake";
+  bakeEl.title = comparing
+    ? "Ask all three models the whole poem (B)"
+    : "Generate the whole poem continuously (B)";
+}
+
+function triptychPill(): string {
+  return triScope === "poem"
+    ? "Triptych · the whole poem"
+    : "Triptych · one line, three models";
 }
 
 function setComparing(on: boolean): void {
@@ -479,9 +786,25 @@ function setComparing(on: boolean): void {
   comparing = on;
   appEl.classList.toggle("comparing", on);
   triptychEl.textContent = on ? "Close" : "Compare";
-  modePillEl.textContent = on ? "Triptych · three models" : "Search instrument · live";
-  if (on) generateTriptych();
+  modePillEl.textContent = on ? triptychPill() : "Search instrument · live";
+  // The bench's labels describe the bench. In the triptych the same buttons ask three
+  // models, and a button that says "Draft line" while doing something else is how the
+  // instruction on screen stops matching the control.
+  setBarLabels();
+  if (!on) {
+    // Hand the transport back to the bench immediately. Waiting for its next frame would
+    // leave a panel's reading on screen for as long as the bench stays paused.
+    showBenchCounter();
+    return;
+  }
+  updateTriptychBanner();
+  // One line is cheap enough to answer the moment the view opens. The whole poem is not,
+  // so it waits to be asked.
+  if (triScope === "line") void generateTriptych();
+  else setTriScope("poem");
 }
+
+triScopeEl.addEventListener("click", () => setTriScope(triScope === "poem" ? "line" : "poem"));
 
 // ---- the notation registers ----
 //
@@ -699,8 +1022,7 @@ function showTelemetry(usingBake: boolean): void {
   if (!motion) return;
   const ghostCount = motion.variants?.length ?? 0;
   const provenance = motion.provenance;
-  const safe = (value: unknown) =>
-    String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const safe = escapeHtml;
   const lineCount = poem.written.length;
   telemetryEl.innerHTML =
     `<span class="k">model</span> ${safe(motion.model)}<br>` +
@@ -733,13 +1055,35 @@ function showTelemetry(usingBake: boolean): void {
 // Which line the playhead was inside last tick, so the DOM is only touched when it moves.
 let shownSegment = -1;
 
-renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
-  lastFrame = frame;
+// The bench's last reported position. Kept because the renderer only emits while something
+// is moving: closing the triptych over a paused bench would otherwise leave a panel's
+// reading on the transport, describing a body that is no longer on screen.
+type BenchFrame = { frame: number; total: number; fps: number; playing: boolean; segmentIndex: number };
+let lastBench: BenchFrame | null = null;
+
+/** Put the bench's own position back on the transport. */
+function showBenchCounter(): void {
+  if (!lastBench) {
+    counterEl.textContent = "";
+    return;
+  }
+  const { frame, total, fps, playing, segmentIndex } = lastBench;
   playPauseEl.textContent = playing ? "Pause" : "Play";
-  counterEl.textContent = `frame ${frame} / ${total - 1}  ·  ${fps} fps`;
+  const where =
+    playingLines.length > 1 ? `line ${segmentIndex + 1}/${playingLines.length}  ·  ` : "";
+  counterEl.textContent = `${where}frame ${frame} / ${total - 1}  ·  ${fps} fps`;
   if (!userScrubbing && total > 1) {
     scrubEl.value = String(Math.round((frame / (total - 1)) * 1000));
   }
+}
+
+renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
+  lastFrame = frame;
+  lastBench = { frame, total, fps, playing, segmentIndex };
+  // While the triptych is open the bench is still running, hidden, and usually holding a
+  // different motion. It must not narrate the transport for a body nobody can see — the
+  // lead panel does that (see `onTriFrame`).
+  if (!comparing) showBenchCounter();
   // walk the "now" marker through every open register
   for (const set of playheads) set(frame);
 
@@ -861,48 +1205,79 @@ async function refreshCapabilities(): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/health`);
     if (!res.ok) return;
-    const health = (await res.json()) as {
-      capabilities?: { model: string; source: string; ready: boolean }[];
-    };
+    const health = (await res.json()) as { capabilities?: Capability[] };
     for (const capability of health.capabilities ?? []) {
-      const option = modelEl.querySelector<HTMLOptionElement>(
-        `option[value="${capability.model}"]`,
-      );
-      if (!option) continue;
-      const name = capability.model === "language-of-motion"
-        ? "Language of Motion"
-        : capability.model === "snapmogen" ? "SnapMoGen" : "Kimodo";
+      capabilities.set(capability.model, capability);
+      const name = modelName(capability.model);
       const state = capability.source === "fixture"
         ? "stub"
         : capability.ready ? "real" : "real · unavailable";
-      option.textContent = `${name} · ${state}`;
+      const option = modelEl.querySelector<HTMLOptionElement>(
+        `option[value="${capability.model}"]`,
+      );
+      if (option) option.textContent = `${name} · ${state}`;
       const triptychName = document.getElementById(`tri-name-${capability.model}`);
       if (triptychName) triptychName.textContent = `${name} · ${state}`;
     }
+    // The banner is a claim about what these panels are, so it is rebuilt from what the
+    // service just said rather than left as a sentence somebody typed once.
+    updateTriptychBanner();
   } catch {
     // Generate owns the full actionable service error; leave "checking…" honest here.
   }
 }
 
 // ---- events ----
-// The bar drives whichever instrument is open: the triptych compares one line across
-// models, the bench drafts that line into the poem.
+//
+// The bar drives whichever instrument is open: the triptych asks its models, the bench
+// drafts into the poem. Every route in — the button and the keyboard both — goes through
+// these two, for the reason `space` already goes through `playPauseEl.click()`: a second
+// path is a path that forgets. `D` used to call `draftLine` directly, so in the triptych it
+// silently drafted a bench line nobody could see.
+
 function draftHere(): void {
   if (comparing) void generateTriptych();
   else void draftLine();
 }
 
+/** `B` has always meant "the whole poem". In the triptych, that is the poem scope. */
+function bakeHere(): void {
+  if (!comparing) {
+    void bake();
+    return;
+  }
+  if (triScope !== "poem") setTriScope("poem");
+  void generateTriptych();
+}
+
 generateEl.addEventListener("click", draftHere);
-bakeEl.addEventListener("click", () => void bake());
+bakeEl.addEventListener("click", bakeHere);
 triptychEl.addEventListener("click", () => setComparing(!comparing));
 registersBtnEl.addEventListener("click", () => setReading(!reading));
 
-playPauseEl.addEventListener("click", () => {
-  renderer.togglePlay();
-  // in the triptych the three panels move together — comparing motions that are out of
-  // step with each other would tell you nothing
-  for (const r of triRenderers.values()) r.togglePlay();
-});
+/**
+ * Play or pause everything on screen, as ONE state.
+ *
+ * Not a toggle each. Toggling every renderer independently inverts whatever was already out
+ * of step instead of bringing it into step — one panel that had nothing loaded when the
+ * others started would flip to playing exactly when they stopped. Comparing motions that
+ * are out of step with each other would tell you nothing.
+ *
+ * The state is read from whichever renderer the transport is reporting, so the button and
+ * the counter can never disagree about what is happening.
+ */
+function setPlayingAll(on: boolean): void {
+  for (const r of [renderer, ...triRenderers.values()]) {
+    if (on) r.play();
+    else r.pause();
+  }
+}
+
+function transportLead(): StickFigureRenderer {
+  return (comparing && triLead ? triRenderers.get(triLead) : undefined) ?? renderer;
+}
+
+playPauseEl.addEventListener("click", () => setPlayingAll(!transportLead().playing));
 ghostsEl.addEventListener("change", () => renderer.setGhostsVisible(ghostsEl.checked));
 
 scrubEl.addEventListener("input", () => {
@@ -956,16 +1331,18 @@ window.addEventListener("keydown", (e) => {
       renderer.setGhostsVisible(ghostsEl.checked);
       break;
     case "d":
-      void draftLine();
+      draftHere();
       break;
     case "b":
-      void bake();
+      bakeHere();
       break;
     case "l":
       if (poem.selectedId !== null) toggleLoopLine(poem.selectedId);
       break;
     case "n":
-      if (!scoreScopeEl.disabled) setScoreScope(scoreScope === "line" ? "poem" : "line");
+      // Both views have a scope, and only one of them is ever on screen.
+      if (comparing) setTriScope(triScope === "poem" ? "line" : "poem");
+      else if (!scoreScopeEl.disabled) setScoreScope(scoreScope === "line" ? "poem" : "line");
       break;
   }
 });

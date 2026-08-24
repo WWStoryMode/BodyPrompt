@@ -296,6 +296,11 @@ def health() -> dict:
         "ready": cuda and load_error is None and get_model.cache_info().currsize == 1,
         "cuda": cuda,
         "model_version": MODEL_VERSION,
+        # A CAPABILITY, not a record of anything that happened. SnapMoGen has no way to
+        # condition a line on the body the previous line left, so a request carrying
+        # `lines` is refused (see GenerateRequest). Saying so here lets a caller ask the
+        # right way round — line by line — instead of discovering the refusal by failing.
+        "can_stitch_poems": False,
         "min_frames": MIN_FRAMES,
         "max_frames": MAX_FRAMES,
         "unit_length": UNIT_LENGTH,
