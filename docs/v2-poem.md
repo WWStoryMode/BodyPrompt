@@ -221,7 +221,19 @@ for a two-second line, whether per-line normalisation flatters a weak line into 
 strong. That is a studio judgement and it stays one; it is the parked "notation readability"
 question, and Stage C only makes it askable.
 
-### Still to come
+## What v2 left undone
 
-Nothing here is persisted. A reload still destroys the poem; that is deliberate and
-deferred.
+All three stages are merged. Four things were left out on purpose, and are recorded in the
+README under **Parked, deliberately** so they are not mistaken for oversights:
+
+- **Persistence** — nothing is saved, so a reload destroys the poem and every line's history
+  with it. The open question is *where a search should live* (a file, the browser, the
+  service), not how to serialise it.
+- **The ghost-cloud on a baked poem** — variance stays a per-line instrument; a whole-poem
+  cloud is a design question before it is a cost question.
+- **Reusing the unchanged head of a re-bake** — lines before an edit *should* return
+  bit-identical, but that is reasoning from Kimodo's structure and has not been measured.
+- **A poem in the triptych** — the model comparison still takes one prompt.
+
+And one thing deliberately not done: **nothing blends the seams between drafted lines.**
+There is no pose interpolation anywhere in the codebase, on purpose.

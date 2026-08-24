@@ -188,19 +188,48 @@ the stub for a model.
 
 ### Parked, deliberately
 
-Real generation raised questions the stub could not. They belong to the versions that own
-those instruments rather than to v1, and are held until those versions are reopened:
+Building the instruments raised things worth doing that were **not** worth doing yet. They
+are recorded here rather than in a branch, so nothing is quietly forgotten and nothing is
+quietly half-built.
 
-- **v2.5 — displacement in the ghost-cloud.** Kimodo's siblings travel different distances
-  for one prompt (2.31, 3.12, 3.64, 4.77 m), and roughly 75% of the visible spread between
-  them is root travel rather than limb difference. **Displacement is real variance and stays
-  in the performance view** — how far a body goes is part of how the model read the prompt,
-  not an artefact to be normalised away. What remains open is offering *pelvis-aligned* as an
+**From v1 — real generation asked what the stub could not:**
+
+- **Displacement in the ghost-cloud.** Kimodo's siblings travel different distances for one
+  prompt (2.31, 3.12, 3.64, 4.77 m), and roughly 75% of the visible spread between them is
+  root travel rather than limb difference. **Displacement is real variance and stays in the
+  performance view** — how far a body goes is part of how the model read the prompt, not an
+  artefact to be normalised away. What remains open is offering *pelvis-aligned* as an
   optional view, so the ~0.15 m of genuine articulation difference can be examined on its own
   when that is the question being asked. An option, never the default.
-- **Persistence.** Nothing is saved: a reload destroys the poem. The instrument is
-  deliberately session-shaped for now, and where a search should live — a file, the browser,
-  the service — is an open question rather than an oversight.
+
+**From v2 — the poem's unfinished edges:**
+
+- **Persistence.** Nothing is saved: a reload destroys the poem, every line's history with
+  it. The instrument is deliberately session-shaped for now, and *where a search should live*
+  is the actual question — a file the writer owns and can put beside their notes, the
+  browser, or the service. Each answer says something different about whose the search is.
+  This is the largest gap and the one most likely to be felt first.
+- **The ghost-cloud on a baked poem.** Variance is currently a per-line instrument: switch it
+  on and drafting one line gives four readings of that line. A bake carries no cloud, because
+  four readings of a five-line poem is minutes of generation, and because the model cannot
+  re-roll one line on its own. What a *whole-poem* cloud would even mean — four readings of
+  the same score, or four different paths through one line — is a design question before it
+  is a cost question.
+- **Reusing the unchanged head of a re-bake.** Editing line *k* re-runs the whole poem.
+  Lines before *k* should return bit-identical, since their seed and inputs are unchanged —
+  but that is reasoning from Kimodo's structure, **not something measured**. If it holds, a
+  re-bake could reuse them and the cost of an edit would fall to the lines that actually
+  changed. Measuring it is the first step, not optimising.
+- **A poem in the triptych.** The multi-model comparison still takes one prompt, as it did
+  when the instrument was a tree. Comparing how three models carry a *whole poem* — where
+  each one loses the thread between sentences — is a different and probably better question
+  than comparing three single phrases. Waits on the other two models being real.
+
+**Deliberately not doing** — recorded so it is not mistaken for an oversight:
+
+- **Blending the seams between drafted lines.** There is no pose interpolation anywhere in
+  the codebase, on purpose. A draft's joins are meant to be visible: smoothing them would
+  disguise the exact thing the draft/bake distinction exists to show.
 
 ### Questions for the research, not the build
 
