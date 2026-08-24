@@ -29,7 +29,7 @@ import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
-from .adapter import adapt_motion
+from .adapter import HEAD_HEIGHT_M, adapt_motion, scale_for
 
 MODEL_VERSION = "SnapMoGen-MoMaskPlus"
 FPS = 30
@@ -102,8 +102,36 @@ def requested_frames(duration_seconds: float) -> int:
     return int(round(clamped / UNIT_LENGTH) * UNIT_LENGTH)
 
 
+# Which trained transformer to use. SnapMoGen ships two; this is the one its own eval
+# config names, and the one the paper's numbers were produced with.
+TRANS_NAME = os.environ.get(
+    "SNAPMOGEN_TRANS_NAME", "momaskplus_hrvq3_nlayer8_cdp0.1_ca_bm"
+)
+GMR_NAME = os.environ.get("SNAPMOGEN_GMR_NAME", "gmr_d292")
+# SnapMoGen's own defaults for masked-transformer refinement and classifier-free guidance.
+DEFAULT_TIMESTEPS = 16
+COND_SCALE = 4
+
+
+class Loaded:
+    """Everything one generation needs, held together so it is loaded exactly once."""
+
+    def __init__(self, vq, transformer, skeleton, joint_names, mean, std, joint_num,
+                 scale, rest_head_units):
+        self.vq = vq
+        self.transformer = transformer
+        self.skeleton = skeleton
+        self.joint_names = joint_names
+        self.mean = mean
+        self.std = std
+        self.joint_num = joint_num
+        #: The rig's unit in metres, measured from its own rest pose at load time.
+        self.scale = scale
+        self.rest_head_units = rest_head_units
+
+
 @lru_cache(maxsize=1)
-def get_model():
+def get_model() -> Loaded:
     """Load SnapMoGen once. Raises with a usable message when the weights are absent."""
     install_numpy_shim()
     if SNAPMOGEN_DIR not in sys.path:
@@ -113,12 +141,10 @@ def get_model():
 
     import torch
 
+    root = pathlib.Path(CHECKPOINT_DIR) / "snapmogen"
+    meta = pathlib.Path(META_DIR)
     missing = [
-        str(p) for p in (
-            pathlib.Path(META_DIR) / "mean.npy",
-            pathlib.Path(META_DIR) / "std.npy",
-            pathlib.Path(CHECKPOINT_DIR) / "snapmogen",
-        ) if not p.exists()
+        str(p) for p in (meta / "mean.npy", meta / "std.npy", root) if not p.exists()
     ]
     if missing:
         raise RuntimeError(
@@ -130,11 +156,116 @@ def get_model():
     if not torch.cuda.is_available():
         raise RuntimeError("no CUDA device visible to the SnapMoGen worker")
 
-    raise NotImplementedError(
-        "SnapMoGen model loading is not built yet — Stage B scaffolding. The adapter, the "
-        "request contract and the length rules are done and tested; what is missing is the "
-        "checkpoint wiring, which is blocked on the weights."
+    from config.load_config import load_config
+    from model.transformer.transformer import MoMaskPlus
+    from model.vq.rvq_model import HRVQVAE
+
+    # Paths are built here rather than from the checkpoints' own configs: those carry the
+    # authors' machine in them (`/mnt/local-disk/...`), and their `data.name` says
+    # "snapmotion" while the directory the download script creates is "snapmogen" — so
+    # following them would look in the wrong place.
+    trans_dir = root / "momask_plus" / TRANS_NAME
+    trans_cfg = load_config(str(trans_dir / "train_momaskplus.yaml"))
+    vq_dir = root / "vq" / trans_cfg.vq_name
+    vq_cfg = load_config(str(vq_dir / "residual_vqvae.yaml"))
+    trans_cfg.vq = vq_cfg.quantizer
+
+    vq = HRVQVAE(
+        vq_cfg, vq_cfg.data.dim_pose, vq_cfg.model.down_t, vq_cfg.model.stride_t,
+        vq_cfg.model.width, vq_cfg.model.depth, vq_cfg.model.dilation_growth_rate,
+        vq_cfg.model.vq_act, vq_cfg.model.use_attn, vq_cfg.model.vq_norm,
     )
+    # `vq_ckpt` names which VQ checkpoint this transformer was trained against — it is
+    # net_best_mpjpe, not the net_best_fid sitting beside it. Loading the other one would
+    # pair the transformer with a codebook it never saw.
+    vq_ckpt = torch.load(vq_dir / "model" / trans_cfg.vq_ckpt, map_location="cuda",
+                         weights_only=True)
+    vq.load_state_dict(vq_ckpt["vq_model" if "vq_model" in vq_ckpt else "model"])
+    vq.to("cuda").eval()
+
+    transformer = MoMaskPlus(
+        code_dim=trans_cfg.vq.code_dim,
+        latent_dim=trans_cfg.model.latent_dim,
+        ff_size=trans_cfg.model.ff_size,
+        num_layers=trans_cfg.model.n_layers,
+        num_heads=trans_cfg.model.n_heads,
+        dropout=trans_cfg.model.dropout,
+        text_dim=trans_cfg.text_embedder.dim_embed,
+        cond_drop_prob=trans_cfg.training.cond_drop_prob,
+        device="cuda",
+        cfg=trans_cfg,
+        full_length=trans_cfg.data.max_motion_length // 4,
+        scales=vq_cfg.quantizer.scales,
+    )
+    ckpt = torch.load(trans_dir / "model" / "net_best_fid.tar", map_location="cuda",
+                      weights_only=True)
+    weights = ckpt["t2m_transformer"]
+    transformer.load_state_dict(
+        weights if isinstance(weights, dict) else weights.state_dict()
+    )
+    transformer.to("cuda").eval()
+
+    # The skeleton comes from A_Pose.bvh in SnapMoGen's own repository rather than from the
+    # 3.51 GB BVH corpus its reference script reads one file out of. Whether its proportions
+    # match the training rig is what the bone-rigidity check answers.
+    from common.skeleton import Skeleton
+    from utils import bvh_io
+
+    anim = bvh_io.load(os.path.join(SNAPMOGEN_DIR, "utils", "A_Pose.bvh"))
+    skeleton = Skeleton(anim.offsets, anim.parents, device="cuda")
+
+    # The rig is not metric — its rest head joint is at 93.08 units — so the unit is
+    # measured here from the rig itself rather than assumed. Walking the parent chain
+    # rather than trusting a constant means a rig change moves the scale with it.
+    names = list(anim.names)
+    heights: dict[int, float] = {}
+    for i, parent in enumerate(anim.parents):
+        heights[i] = float(anim.offsets[i][1]) + (heights[parent] if parent >= 0 else 0.0)
+    rest_head_units = heights[names.index("C_head_bind_JNT")]
+
+    return Loaded(
+        vq=vq,
+        transformer=transformer,
+        skeleton=skeleton,
+        joint_names=list(anim.names),
+        mean=np.load(meta / "mean.npy"),
+        std=np.load(meta / "std.npy"),
+        joint_num=trans_cfg.data.joint_num,
+        scale=scale_for(rest_head_units),
+        rest_head_units=rest_head_units,
+    )
+
+
+def _sample(model: Loaded, prompt: str, frames: int, count: int, timesteps: int):
+    """Generate `count` samples of one prompt and return their joint positions and rotations.
+
+    One batch, not a loop: SnapMoGen conditions on a batch of texts, so N copies of one
+    prompt cost a single forward pass. That also fixes the ghost-cloud's contract — the
+    batch is reproducible from the seed, but the siblings inside it are not separately
+    addressable the way Kimodo's consecutive seeds are.
+    """
+    import torch
+    from einops import rearrange
+    from utils.motion_process_bvh import recover_bvh_from_rot
+
+    m_lens = torch.tensor([frames] * count, device="cuda").long()
+    with torch.no_grad():
+        mids = model.transformer.generate(
+            [prompt] * count, m_lens // 4, timesteps, COND_SCALE,
+            temperature=1, topk_filter_thres=0.9, gsample=True,
+        )
+        pred = model.vq.forward_decoder(mids, m_lens)
+        std = torch.from_numpy(model.std[: pred.shape[-1]]).float().cuda()
+        mean = torch.from_numpy(model.mean[: pred.shape[-1]]).float().cuda()
+        feats = pred * std + mean
+        b = feats.shape[0]
+        _, local_quats, r_pos = recover_bvh_from_rot(
+            feats, model.joint_num, model.skeleton, keep_shape=False
+        )
+        _, global_pos = model.skeleton.fk_local_quat(local_quats, r_pos)
+        global_pos = rearrange(global_pos, "(b l) j d -> b l j d", b=b)
+        local_quats = rearrange(local_quats, "(b l) j d -> b l j d", b=b)
+    return global_pos.cpu().numpy(), local_quats.cpu().numpy()
 
 
 @asynccontextmanager
@@ -168,6 +299,7 @@ def health() -> dict:
         "min_frames": MIN_FRAMES,
         "max_frames": MAX_FRAMES,
         "unit_length": UNIT_LENGTH,
+        "rig_head_height_m": HEAD_HEIGHT_M,
         "error": load_error,
     }
 
@@ -178,4 +310,48 @@ def generate(req: GenerateRequest) -> dict:
         model = get_model()
     except Exception as err:  # noqa: BLE001
         raise HTTPException(status_code=503, detail=str(err)) from err
-    raise HTTPException(status_code=503, detail=f"unreachable until {model} loads")
+
+    from utils.fixseeds import fixseed
+
+    asked = round(req.duration_seconds * FPS)
+    frames = requested_frames(req.duration_seconds)
+    timesteps = req.denoising_steps or DEFAULT_TIMESTEPS
+
+    fixseed(req.seed)
+    try:
+        positions, quats = _sample(model, req.prompt, frames, req.variants, timesteps)
+    except Exception as err:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"{type(err).__name__}: {err}") from err
+
+    motions = [
+        adapt_motion(
+            positions[i], quats[i], model.joint_names,
+            fps=FPS, prompt=req.prompt, seed=req.seed, frames=frames,
+            scale=model.scale,
+        )
+        for i in range(req.variants)
+    ]
+    motion = motions[0]
+    if len(motions) > 1:
+        motion["variants"] = motions[1:]
+
+    # What the worker DID, never what it was asked for. Three of these differ from the
+    # request often enough that echoing the request would be a lie:
+    #
+    #   frames      SnapMoGen quantises to whole units and will not go below its own floor,
+    #               so a 2 s line is answered by 4.27 s of motion and must say so.
+    #   post_processing  the GlobalRegressor refinement is not wired up yet, so this is
+    #               false whatever was asked.
+    #   multi_prompt     always false: this model cannot stitch a poem at all.
+    motion["denoising_steps"] = timesteps
+    motion["post_processing"] = False
+    motion["multi_prompt"] = False
+    motion["transition_frames"] = None
+    motion["frames_asked"] = asked
+    motion["frames_used"] = frames
+    # SnapMoGen's rig is not metric. The factor is measured from the rig's own rest pose,
+    # so the motion can say what convention put it into metres rather than leaving a
+    # reader to assume one.
+    motion["rig_scale"] = round(model.scale, 8)
+    motion["rig_head_height_m"] = HEAD_HEIGHT_M
+    return motion

@@ -173,7 +173,7 @@ in front of an audience:
 | **v2** | **The poem as score** — the search composed as a poem, each line a prompt, the body carrying from one into the next | ✓ done — generation, editor, and the registers reading a line |
 | **v2.5** | **Variance** (ghost-cloud) + the **notation registers** — all four: chronophotograph, strip, floor path, Laban-inspired score | ✓ done |
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
-| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; no new model yet |
+| **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ◐ routing split per model; SnapMoGen real; Language of Motion still a fixture |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
 | **v1** | Single-model prompting — Kimodo behind the service | ✓ done |
 | **v4** | The public lecture performance itself — the search performed live | |
@@ -425,7 +425,8 @@ Working today: type a phrase → a 3D stick figure moves; every prompt branches 
 **many seeds** as a variance
 **ghost-cloud**; and the motion is reduced to four readable **notation registers** — a Marey
 **chronophotograph**, a **notation strip**, a **floor path**, and a **Laban-inspired score**.
-A pluggable `Generator` routes either to the five fixtures or to the isolated Kimodo worker.
+A pluggable router sends **each model** to whatever serves it — a local worker, a remote
+endpoint, or the fixtures — so one model can be real while another is not.
 
 Also working: the **multi-model triptych** (one prompt, three models side by side, each
 keeping its native way of authoring) and **performance mode** (the projectable stage).
@@ -436,8 +437,15 @@ keeping its native way of authoring) and **performance mode** (the projectable s
   understood and the ghost-cloud is seeded perturbation.
 - With the v1 backend, only an output whose runtime provenance says `source: kimodo` is a
   model generation. The UI derives that label from `/health`, not from the selected name.
-- SnapMoGen and Language of Motion remain fixtures. The mixed triptych is therefore **not
-  evidence of cross-model interpretation**, even when its Kimodo panel is real.
+- **Language of Motion remains a fixture.** SnapMoGen became real in v3 (2026-08-24), so the
+  triptych now compares **two real models and one stand-in** — better than it was, and still
+  not a three-model comparison.
+- **Both real models move far less for a poetic prompt than a literal one.** "a body
+  remembers a place it cannot return to" gets a 0.03 m wrist span from SnapMoGen and 0.18 m
+  from Kimodo; "A person walks forward and turns around" gets 3.95 m and 2.38 m. SnapMoGen is
+  the more literal of the two, but neither does much with poetry. That is an **observation
+  from five prompts and two crude scalars, not a result** — and it is precisely the question
+  this instrument exists to ask properly.
 
 > **In fixture mode there are five hand-authored motions in the entire system**, and every
 > movement you see is one of those five wearing a little seeded jitter. That is the default,

@@ -56,11 +56,11 @@ services:
               count: 1
               capabilities: [gpu]
 
-  # Not real yet: the adapter, the contract and the length rules are built and tested, but
-  # the checkpoints are not wired up. Left out of the local-gpu profile on purpose, so
-  # nobody starts it expecting motion. See docs/v3-models.md.
+  # Real as of v3 Stage B. Cheap enough to leave resident beside Kimodo: ~2 GB RSS and
+  # 0.6 GB VRAM, against Kimodo's 16-17.8 GB. Needs its checkpoints mounted — see the
+  # README in its checkpoints/ directory — and reports ready:false naming what is missing.
   snapmogen-worker:
-    profiles: ["snapmogen"]
+    profiles: ["local-gpu", "snapmogen"]
     build:
       context: ./inference
       dockerfile: snapmogen-worker/Dockerfile

@@ -10,8 +10,13 @@ and nothing crashes.
 
 Two differences from the Kimodo path, both measured during the Stage B spike:
 
-- **Centimetres.** SnapMoGen's rig has its root 56 cm up and its hips 6.6 cm apart. The
-  canonical schema is metres.
+- **A rig that is not metric.** Its rest-pose head joint sits at 93.08 units. If those were
+  centimetres the body would stand 0.85 m tall, which is not a person — and the notation
+  registers would read it as a permanent crouch, because their thresholds (a planted foot
+  below 0.08 m, a knee-height ankle below 0.6 m) are calibrated in real metres. SnapMoGen
+  never claims a unit, so any mapping to metres is a *convention*, and this one is stated
+  rather than hidden: scale so the rest-pose head joint lands at `HEAD_HEIGHT_M`. Measured
+  from the rig at load time, never a magic constant, and recorded in provenance.
 - **Quaternions, not matrices.** Its forward kinematics already produces per-joint local
   quaternions, so there is nothing to convert — only an order to fix.
 """
@@ -31,6 +36,8 @@ from bodyprompt_motion import (
 
 __all__ = [
     "CM_TO_M",
+    "HEAD_HEIGHT_M",
+    "scale_for",
     "EDGES",
     "JOINTS",
     "SNAPMOGEN_JOINT_MAP",
@@ -73,8 +80,25 @@ SNAPMOGEN_JOINT_MAP = {
     "right_wrist": "R_hand0001_bind_JNT",
 }
 
-#: SnapMoGen's rig is authored in centimetres; `bodyprompt.motion/v0` is metres.
+#: If SnapMoGen's rig units were centimetres. Kept because it is the obvious reading, and
+#: because the tests below pin what it would give: an 0.85 m body.
 CM_TO_M = 0.01
+
+#: Where a standing body's head JOINT sits, in metres — the convention this worker uses to
+#: put a non-metric rig into a metric schema.
+#:
+#: Chosen for comparability rather than anthropometric truth: Kimodo's own output lands its
+#: head joint at 1.567 m, so at 1.60 m the two models produce bodies within 2% of each
+#: other and the triptych compares movement rather than scale. Not a measurement of
+#: anything, which is why it is one named constant and not scattered arithmetic.
+HEAD_HEIGHT_M = 1.60
+
+
+def scale_for(rest_head_units: float, head_height_m: float = HEAD_HEIGHT_M) -> float:
+    """The rig's unit in metres, measured from its own rest pose."""
+    if rest_head_units <= 0:
+        raise ValueError(f"rest head height must be positive, got {rest_head_units}")
+    return head_height_m / rest_head_units
 
 
 def resolve_joint_indices(source_names: Sequence[str]) -> list[int]:
@@ -109,6 +133,7 @@ def adapt_motion(
     prompt: str,
     seed: int,
     frames: int | None = None,
+    scale: float = CM_TO_M,
 ) -> dict:
     """Return one non-nesting `bodyprompt.motion/v0` motion.
 
@@ -128,7 +153,7 @@ def adapt_motion(
         local_quaternions = truncate(local_quaternions, frames)
 
     indices = resolve_joint_indices(source_names)
-    pos = np.asarray(positions[:, indices, :], dtype=np.float64).copy() * CM_TO_M
+    pos = np.asarray(positions[:, indices, :], dtype=np.float64).copy() * scale
     quat = np.asarray(local_quaternions[:, indices, :], dtype=np.float64)
     if not np.isfinite(pos).all() or not np.isfinite(quat).all():
         raise ValueError("SnapMoGen returned NaN or infinite motion values")

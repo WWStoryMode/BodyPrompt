@@ -253,3 +253,90 @@ root translation, loaded separately from the VQ-VAE and the transformer and easy
 Still needed, all requiring the weights: motion quality, whether sub-128-frame output is
 usable, bone-length rigidity (the joint map's real test), head height in metres confirming
 the 0.01 scale, and real-weight latency.
+
+
+### 2026-08-24 — Stage B, SnapMoGen is real
+
+The weights arrived and the worker generates. Measured on the RTX 5080.
+
+#### The A_Pose hypothesis: confirmed, with evidence
+
+Stage B's scaffolding rested on a guess — that the repo's own `utils/A_Pose.bvh` could stand
+in for the one BVH the reference script reads out of a 3.51 GB corpus. It can. Rather than
+download 3.27 GiB to find out, the archive's central directory was read with HTTP range
+requests and the single file pulled out: **212 KiB fetched instead of 3.27 GiB**.
+
+`A_Pose.bvh` and `renamed_bvhs/m_ep2_00086.bvh` have the **same 24 joint names in the same
+order**, and their rest offsets agree to within 0.9%. So the worker needs about **5 KB** of
+that dataset, and that is now a measurement rather than a hope.
+
+#### The rig is not metric — and bone rigidity could not have told us
+
+Its rest-pose head joint sits at **93.08 rig units**. Read as centimetres — the obvious
+reading, and the one the scaffolding shipped with — the body stands **0.85 m** tall. That is
+not a person, and the notation registers would read it as a permanent crouch: their
+thresholds are calibrated in real metres (a planted foot below 0.08 m, a knee-height ankle
+below 0.6 m).
+
+Worth naming the trap: **bone-length rigidity does not validate the skeleton here.** For
+Kimodo the positions come from the model, so rigidity proves the joint map. For SnapMoGen
+the positions come from forward kinematics over the *template* skeleton, so bones are rigid
+by construction whatever scale or template is used. The check still catches a scrambled map;
+it cannot catch a wrong-sized rig. Only comparing the head height against a body caught this.
+
+SnapMoGen never claims a unit, so mapping to metres is a **convention**. The worker states
+it: scale so the rest-pose head joint lands at `HEAD_HEIGHT_M` (1.60 m, chosen so the two
+real models sit within 2% of each other — Kimodo's own output lands at 1.567 m). The factor
+is **measured from the rig at load time**, not a constant, and every motion carries it as
+`rig_scale`.
+
+#### It works, and it is fast
+
+| | asked | frames | wall clock | bone cv | floor | travel |
+|---|---|---|---|---|---|---|
+| "A person is walking confidently." | 5 s | 152 | **0.19 s** | 0.0154% | −0.045 m | 4.20 m |
+| "a body remembers…" | 5 s | 152 | 0.19 s | 0.0075% | −0.001 m | 0.06 m |
+| a 2-second line | 2 s | 128 | 0.19 s | 0.0096% | −0.015 m | 0.04 m |
+| ghost-cloud, 4 variants | 5 s | 152 | **0.28 s** | — | — | spread 0.26–1.30 m |
+
+Bone-length cv **0.0075–0.0154%** across all 21 bones, against Kimodo's 0.008% — the joint
+map is right. Four ghost-cloud siblings cost 0.28 s in one batch, where Kimodo pays ~4.6 s
+per variant.
+
+Two honest imperfections, both recorded rather than hidden:
+
+- **Feet penetrate the floor by up to 4.5 cm** while walking. Kimodo's zero comes from its
+  post-processing pass; SnapMoGen's equivalent — the GlobalRegressor that refines root
+  translation — is **not wired up**, so `provenance.post_processing` is `false` whatever was
+  asked. That is the next piece of work on this worker.
+- **A 2-second line is answered by 4.27 seconds** of motion, because the model will not go
+  below 128 frames. `frames_asked` and `frames_used` are both in the response.
+
+#### The comparison the triptych was built for, finally real
+
+The same prompts through both models, one service:
+
+| prompt | Kimodo travel / wrist span | SnapMoGen travel / wrist span |
+|---|---|---|
+| "a body remembers a place it cannot return to" | 0.02 m / 0.18 m | 0.03 m / **0.03 m** |
+| "look back, then go" | 0.78 m / 1.21 m | 0.24 m / 0.66 m |
+| "the ground remembers" | 0.01 m / 0.24 m | 0.06 m / 0.39 m |
+| "A person walks forward and turns around." | 2.11 m / 2.38 m | 3.89 m / **3.95 m** |
+| "A person raises both arms above their head." | 0.02 m / 1.15 m | 0.04 m / 0.93 m |
+
+**Both models articulate less for poetic phrasing than for literal instruction**, and
+SnapMoGen more so than Kimodo. An earlier draft of this log called that a SnapMoGen defect;
+it is not, and the correction matters — the tendency is shared.
+
+It is also **not a result**. Two crude scalars over five prompts is an observation. But it is
+the first time this repository has been able to make one at all, because until today two of
+the three panels were the same fixture wearing seeded noise.
+
+#### Honesty debt cleared in the same commit
+
+`docs/v0-stub.md` retires fake #1 and #3 for `source: snapmogen`, and downgrades fake #2 from
+"the models are not real" to **two of three real**. The README Status section says the same.
+`snapmogen` is routed to its worker; **Language of Motion is still a fixture** and says so.
+
+Still owed on this worker: the GlobalRegressor pass, and whether sub-128-frame requests
+should be refused rather than silently lengthened.

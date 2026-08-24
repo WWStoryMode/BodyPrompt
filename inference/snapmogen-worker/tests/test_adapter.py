@@ -222,3 +222,45 @@ def test_the_motion_says_which_model_made_it_and_that_it_is_not_a_stub():
     assert len(motion["joints"]) == 22
     assert all(len(f["positions"]) == 22 and len(f["rotations"]) == 22
                for f in motion["frames"])
+
+
+# ---- putting a non-metric rig into a metric schema --------------------------
+
+def test_the_rig_scale_is_measured_from_the_rig_not_assumed():
+    """
+    SnapMoGen's rest-pose head joint sits at 93.08 units. Read as centimetres that is an
+    0.85 m body — not a person, and the notation registers would read it as a permanent
+    crouch, because their thresholds (a planted foot below 0.08 m, a knee-height ankle
+    below 0.6 m) are calibrated in real metres.
+
+    The rig never claims a unit, so the mapping is a convention. It is derived from the
+    rig's own rest pose so that a rig change moves it, rather than being a constant that
+    silently stops being true.
+    """
+    from app.adapter import HEAD_HEIGHT_M, CM_TO_M, scale_for
+
+    assert 93.08 * CM_TO_M == pytest.approx(0.9308)          # the naive reading
+    assert 93.08 * scale_for(93.08) == pytest.approx(HEAD_HEIGHT_M)
+    # A different rig, same convention.
+    assert 50.0 * scale_for(50.0) == pytest.approx(HEAD_HEIGHT_M)
+
+
+def test_a_rig_with_no_height_is_refused_rather_than_dividing_by_zero():
+    from app.adapter import scale_for
+
+    with pytest.raises(ValueError, match="must be positive"):
+        scale_for(0.0)
+
+
+def test_the_scale_reaches_the_motion():
+    from app.adapter import scale_for
+
+    positions, quats = rig()
+    scale = scale_for(93.08)
+
+    motion = adapt_motion(positions, quats, SNAPMOGEN_JOINTS, fps=30, prompt="x", seed=1,
+                          scale=scale)
+
+    head = motion["frames"][0]["positions"][JOINTS.index("head")]
+    # Positions are stored to 5 decimal places, so the tolerance is that, not tighter.
+    assert head[1] == pytest.approx((160.0 - 3.0) * scale, abs=1e-5)
