@@ -88,9 +88,71 @@ quietly half-built.
   carries more weight now that the triptych shows `asked N, moved M` on every panel — the
   label makes the lengthening visible, which is an argument for fixing it rather than for
   considering it handled.
+
+  **Upgraded from a labelling concern to a research one on 2026-08-25.** The second batch of
+  the first research session was nine Bausch cues from *Wiesenland*, and Bausch's cues are
+  short — *Trance*, *Budapest*, *Danube*, *Yes*. Seven of the nine lines were asked at **2 s
+  (60 frames)**. Kimodo and Language of Motion returned exactly 60. SnapMoGen returned **128
+  frames — 4.27 s — on every one**, more than double.
+
+  Two consequences, and the second is the serious one:
+
+  - **The measurements stop comparing.** On those seven lines the SnapMoGen panel's `travel`
+    and wrist-`span` are inflated by the window alone, so they cannot be read against the other
+    two panels. Only per-second quantities survive. A researcher reading that triptych without
+    knowing this would draw a false conclusion about which model moves more.
+  - **The poem's rhythm is destroyed on that panel.** A nine-line poem of two-second cues has a
+    tempo, and tempo is choreographic material — it is *part of the score*, not a request
+    parameter. Answering it at 4.27 s a line is not a longer version of the same reading; it is
+    a different piece. The label `asked 60, moved 128` is honest and does not prevent this,
+    because the distortion is in the artefact rather than in the description of it.
+
+  So the argument has changed shape. It is no longer "the label makes it visible, therefore fix
+  it" — it is that **no label can make a wrong tempo right**, and the instrument silently
+  rewrites the score of any poem written in short lines. Refusing the request would at least
+  let the poem be rewritten deliberately.
+
+  Evidence: `~/BodyPrompt-research/2026-08-25-day1b-wiesenland/` (not in this repo — motions
+  are regenerable and exports belong to the writer).
 - **Manual browser verification** of the v2 Stage B caret handling and the Stage C registers.
   Every check so far has been a test suite or a `curl`. For an instrument whose screen *is*
   the artefact, that gap is real.
+
+**From v4 — what the first research session asked for:**
+
+- **The triptych's motions cannot be exported.** Found on 2026-08-25, during the first real
+  research session, and it is the one thing that session wanted and could not have.
+
+  Export serialises the **bench poem** — `toSession(poem)` in `session.ts`, every line, each
+  line's history, the bake, and the motions themselves. That is one model's reading. The
+  triptych's motions never enter the poem at all: they go from `fetch` straight into their
+  panel renderers (`r.load` / `r.loadSequence` in `main.ts`) and live nowhere else, so closing
+  the triptych discards them. Ten of the fifteen motions generated that day — every SnapMoGen
+  and Language of Motion reading of the poem — had no export path.
+
+  **The data is not lost.** The service's motion store holds all of it on disk. The gap is
+  that nothing can hand it back: the service has exactly three routes (`/health`, `/motions`,
+  `/generate`), `/motions` returns metadata only — key, prompt, model, seed, frame count, no
+  joint data — and there is **no fetch-by-key**. Re-issuing a byte-identical `POST /generate`
+  does return the stored motion with `served_from_store: true`, but every parameter has to be
+  reproduced exactly and the browser offers no way to do it.
+
+  Three fixes, smallest first, and they are not alternatives so much as a sequence:
+
+  1. **Read the store from a shell** — recovers a session after the fact. Not the instrument
+     doing it, so it helps once and never again.
+  2. **`GET /motions/{key}`.** Small, and it makes the store genuinely readable. A `?session=`
+     boot flag would need it too, which is the most reuse of the three.
+  3. **The triptych's motions kept in the session file.** The real fix, and the largest,
+     because it means deciding what a session *is* when it holds three models' readings of one
+     poem. That is the accumulation question in
+     [`v4-proposal.md`](v4-proposal.md) arriving early, from the artistic side rather than the
+     performance side.
+
+  Worth noting *why* this matters beyond convenience: a comparison you cannot keep is a
+  comparison you cannot cite. The triptych is the instrument's answer to "how do different
+  models interpret the same poetic theme", and until this is fixed that answer exists only for
+  as long as a browser tab does.
 
 **Deliberately not doing** — recorded so it is not mistaken for an oversight:
 

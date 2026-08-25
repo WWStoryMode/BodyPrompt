@@ -228,7 +228,25 @@ is written down because it is the *kind* of thing this instrument exists to ask 
   travels**, not how it moves. Displacement is real variance and stays in the performance
   view: how far a body goes is part of how the model read the prompt.
 
-Measurements and method: [`docs/v1-implementation.md`](docs/v1-implementation.md) and
+From the first research session, putting Pina Bausch's documented rehearsal cues to all three
+models ([Day 1](docs/journal/2026-08-25-day-1.md)):
+
+- **The models have retrieval where a dancer has association.** Given a cue that names a thing
+  rather than an action, Kimodo stops and SnapMoGen substitutes the nearest describable action
+  — *Danube* becomes locomotion, *Baths* becomes washing. Brinkmann answering *"Trance"* with
+  three bodies against a wall moves **away** from the word; retrieving washing from *"Baths"*
+  moves **toward** it. From outside they look alike, and they are opposites.
+- **They respond to the string, not to the cue.** Re-running the same five cues in Bausch's
+  original German — the same cue, a translation apart — inverts SnapMoGen's readings and
+  removes Kimodo's raised arms. It does not fail visibly; it generates a confident, specific,
+  different motion.
+- **Each model sits at a different point between prescribed geometry and open meaning**, and
+  none sits where Bausch was working. Given the dancer's response rewritten as instructions,
+  SnapMoGen performs it literally — it lies down, it runs — while Kimodo freezes on the most
+  explicit input in the experiment.
+
+Measurements and method: [`docs/journal/`](docs/journal/),
+[`docs/v1-implementation.md`](docs/v1-implementation.md) and
 [`docs/v3-models.md`](docs/v3-models.md).
 
 ---
@@ -292,6 +310,7 @@ Open <http://localhost:5173>, type a phrase, press **Generate**.
 | | |
 |---|---|
 | [`docs/abstract.md`](docs/abstract.md) | The accepted abstract — the canonical framing and vocabulary |
+| [`docs/journal/`](docs/journal/) | **The research journal** — what the instrument has been asked, and what it did |
 | [`docs/lecture-performance.md`](docs/lecture-performance.md) | The live performance this is all built for |
 | [`docs/architecture.md`](docs/architecture.md) | The adapter pattern, the stack, running the real models |
 | [`docs/roadmap.md`](docs/roadmap.md) | Versions, parked items, and questions left open |
