@@ -17,6 +17,14 @@ network, and nothing running.
 | Day | Date | Question |
 |---|---|---|
 | [Day 1](2026-08-25-day-1.md) | 2026-08-25 | Can text-to-motion AI generate *dance*, or only body movement? |
+| [Day 2](2026-09-03-day-2.md) | 2026-09-02–03 | How descriptive must a prompt become before a model answers, and what is lost on the way? |
+
+**Day 2 carries no session files.** Its corpus is 1,215 motions across 870 MB in five
+directories held outside this repository — one per stage: Stage 1 calibration, then Bausch,
+Hay, Naharin and Forti. Day 1's promise above does not hold for it, and rather than quietly
+drop the practice: each directory keeps the driver that ran, the prompts parsed from the
+brief, the seeds, and a full execution report, so **every motion is regenerable** from what
+is recorded.
 
 ## How to read a measurement in these entries
 
