@@ -136,6 +136,121 @@ test("nothing is overwritten — a line keeps every generation it has had", () =
   assert.deepEqual(poem.all[0].history, [one]);
 });
 
+test("moving a line invalidates from where it moved — never above it", () => {
+  const poem = new Poem(["first", "second", "third", "fourth"]);
+  poem.recordBake(baked(poem));
+
+  poem.move(poem.all[2].id, 1); // third moves down past fourth
+
+  // Reordering is an edit to the score: every line from the earlier of the two positions
+  // inherits a different body, and the lines above it inherit exactly what they did.
+  assert.deepEqual(poem.all.map((l) => l.text), ["first", "second", "fourth", "third"]);
+  assert.deepEqual(poem.all.map((l) => l.state), ["baked", "baked", "stale", "stale"]);
+});
+
+test("moving a line up invalidates from the position it moved into", () => {
+  const poem = new Poem(["first", "second", "third", "fourth"]);
+  poem.recordBake(baked(poem));
+
+  poem.move(poem.all[3].id, -2); // fourth moves up between first and second
+
+  assert.deepEqual(poem.all.map((l) => l.text), ["first", "fourth", "second", "third"]);
+  assert.deepEqual(poem.all.map((l) => l.state), ["baked", "stale", "stale", "stale"]);
+});
+
+test("a line at either end has nowhere to go, and nothing happens", () => {
+  const poem = new Poem(["first", "second"]);
+  poem.recordBake(baked(poem));
+
+  assert.equal(poem.move(poem.all[0].id, -1), false);
+  assert.equal(poem.move(poem.all[1].id, 1), false);
+
+  assert.deepEqual(poem.all.map((l) => l.text), ["first", "second"]);
+  assert.deepEqual(poem.all.map((l) => l.state), ["baked", "baked"]); // not even touched
+});
+
+test("rating a line judges it without invalidating it", () => {
+  const poem = new Poem(["first", "second"]);
+  poem.recordBake(baked(poem));
+
+  poem.setRating(poem.all[0].id, 3);
+
+  // Looking at a movement is not editing the score. A line that comes back stale for
+  // having been read would make the instrument unusable for the thing it is being built for.
+  assert.deepEqual(poem.all.map((l) => l.state), ["baked", "baked"]);
+  assert.equal(poem.bakeIsCurrent, true);
+  assert.equal(poem.all[0].rating?.value, 3);
+});
+
+test("unrated is not zero", () => {
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+
+  assert.equal(poem.all[0].rating, null);
+
+  poem.setRating(id, 0);
+  assert.equal(poem.all[0].rating?.value, 0); // a judgement of "nothing there"
+
+  poem.setRating(id, null);
+  assert.equal(poem.all[0].rating, null); // back to never having been asked
+});
+
+test("skip is kept apart from a low score", () => {
+  const poem = new Poem(["first"]);
+  poem.setRating(poem.all[0].id, "skip");
+
+  assert.equal(poem.all[0].rating?.value, "skip");
+  assert.notEqual(poem.all[0].rating?.value, 0);
+});
+
+test("a rating follows the motion it judged into history", () => {
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  const one = motion(30);
+  const two = motion(60);
+
+  poem.recordDraft(id, one);
+  poem.setRating(id, 4);
+  poem.recordDraft(id, two);
+
+  // The verdict was passed on `one`. It stays with `one`, and `two` arrives unjudged
+  // rather than inheriting a reading of a body nobody watched.
+  assert.deepEqual(poem.all[0].history, [one]);
+  assert.equal(poem.all[0].historyRatings[0]?.value, 4);
+  assert.equal(poem.all[0].rating, null);
+});
+
+test("history and its ratings stay the same length through a restore", () => {
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  poem.recordDraft(id, motion(30));
+  poem.setRating(id, 2);
+  poem.recordDraft(id, motion(45));
+  poem.recordDraft(id, motion(60));
+
+  const line = Poem.fromSnapshot(poem.toSnapshot()).all[0];
+
+  assert.equal(line.history.length, 2);
+  assert.equal(line.historyRatings.length, line.history.length);
+  assert.equal(line.historyRatings[0]?.value, 2);
+  assert.equal(line.historyRatings[1], null); // drafted again without being rated
+});
+
+test("a file whose ratings do not line up with its history is repaired, not trusted", () => {
+  const poem = new Poem(["first"]);
+  poem.recordDraft(poem.all[0].id, motion(30));
+  poem.recordDraft(poem.all[0].id, motion(60));
+  const snapshot = poem.toSnapshot();
+  // A hand-edited file, or one written before this field existed.
+  snapshot.lines[0].historyRatings = [];
+
+  const line = Poem.fromSnapshot(snapshot).all[0];
+
+  // Padding beats guessing: a rating shifted onto the wrong motion is worse than none.
+  assert.equal(line.historyRatings.length, line.history.length);
+  assert.deepEqual(line.historyRatings, [null]);
+});
+
 test("a bake request carries only written lines, with their real durations", () => {
   const poem = new Poem(["first line", "", "third line here"]);
   poem.setDuration(poem.all[0].id, 4);

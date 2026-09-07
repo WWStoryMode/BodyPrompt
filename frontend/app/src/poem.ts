@@ -33,6 +33,57 @@ export type LineState =
   /** Had a motion, but an edit invalidated it. */
   | "stale";
 
+/**
+ * How much of the cue is legible in the body that answered it.
+ *
+ * One axis, deliberately. The research question this scale exists for is whether a
+ * perceptible relationship survives the trip from a poetic cue to a generated movement —
+ * not whether the movement is good, and not whether it is complex. A small gesture can
+ * carry a strong relationship; an elaborate sequence can carry none.
+ *
+ * `"skip"` is not a low score. It is the answer for a motion this reader cannot judge,
+ * and keeping it separate from `0` is what stops "I could not tell" being counted as
+ * "there was nothing there".
+ */
+export type RatingValue = 0 | 1 | 2 | 3 | 4 | "skip";
+
+/**
+ * The written anchors, in one place so the scale means the same thing on Friday as it did
+ * on Tuesday. The UI renders these rather than restating them; a rating instrument whose
+ * wording drifts between sittings is measuring the reader, not the motion.
+ */
+export const RATING_ANCHORS: { value: RatingValue; label: string; meaning: string }[] = [
+  { value: 0, label: "none", meaning: "no relationship I can perceive" },
+  { value: 1, label: "faint", meaning: "something, but I could be reading in" },
+  { value: 2, label: "partial", meaning: "one aspect of the cue is legible" },
+  { value: 3, label: "clear", meaning: "the cue is recognisable in the body" },
+  { value: 4, label: "strong", meaning: "the body seems to answer the cue" },
+  { value: "skip", label: "skip", meaning: "can't judge" },
+];
+
+const RATING_VALUES = new Set<unknown>(RATING_ANCHORS.map((a) => a.value));
+
+/** Is this a rating value this instrument recognises? Used when reading a file. */
+export function isRatingValue(value: unknown): value is RatingValue {
+  return RATING_VALUES.has(value);
+}
+
+export interface Rating {
+  value: RatingValue;
+  /** When the judgement was made, ISO 8601. A rating without a date is an opinion. */
+  at: string;
+}
+
+/**
+ * Whatever the file this line came from recorded about it, carried through untouched.
+ *
+ * The Day 2 corpus puts the whole experimental record here — cue, prompt level, seed,
+ * model, artist — and a rating with no way back to those is not evidence of anything. It
+ * is deliberately opaque: this module neither validates it nor knows its shape, for the
+ * same reason a motion is passed through unedited.
+ */
+export type LineMeta = Record<string, unknown>;
+
 export interface PoemLine {
   id: number;
   text: string;
@@ -43,6 +94,12 @@ export interface PoemLine {
   motion: CanonicalMotion | null;
   /** Every past generation of this line, oldest first. Nothing is overwritten. */
   history: CanonicalMotion[];
+  /** The judgement of *this line's current motion*, or null if it has not been rated. */
+  rating: Rating | null;
+  /** Judgements of `history`, index for index. Same length, always. */
+  historyRatings: (Rating | null)[];
+  /** What the source file recorded about this line. Never interpreted here. */
+  meta: LineMeta | null;
 }
 
 /** A poem as plain data — what a session file carries, and what a restore reads. */
@@ -135,9 +192,46 @@ export class Poem {
       state: "empty",
       motion: null,
       history: [],
+      rating: null,
+      historyRatings: [],
+      meta: null,
     };
     this.lines.push(line);
     return line;
+  }
+
+  /**
+   * Move a line up or down the poem.
+   *
+   * Reordering is an edit to the score, not a rearrangement of a list: each baked line is
+   * generated from the body the line before it left, so moving a line changes what every
+   * line from the earlier of the two positions onward inherits. It invalidates exactly as
+   * a rewrite does, and for the same reason.
+   *
+   * Returns false at the ends, where there is nowhere to go.
+   */
+  move(id: number, delta: number): boolean {
+    const from = this.indexOf(id);
+    if (from < 0) return false;
+    const to = from + delta;
+    if (to < 0 || to >= this.lines.length || to === from) return false;
+    const [line] = this.lines.splice(from, 1);
+    this.lines.splice(to, 0, line);
+    this.invalidateFrom(Math.min(from, to));
+    return true;
+  }
+
+  /**
+   * Record — or clear — the judgement of this line's current motion.
+   *
+   * Deliberately does **not** invalidate. A rating is something a reader thought about a
+   * movement; it is not a change to the score, and a line that has been looked at must not
+   * come back marked stale for having been looked at.
+   */
+  setRating(id: number, value: RatingValue | null, now: () => Date = () => new Date()): void {
+    const line = this.get(id);
+    if (!line) return;
+    line.rating = value === null ? null : { value, at: now().toISOString() };
   }
 
   /** Insert a new line directly after `id` — what Enter does at the end of a line. */
@@ -208,11 +302,22 @@ export class Poem {
     if (line) line.state = "generating";
   }
 
-  /** Record a line's own motion. Only ever makes that one line valid. */
+  /**
+   * Record a line's own motion. Only ever makes that one line valid.
+   *
+   * The rating travels with the motion it judged. A judgement was made about a particular
+   * movement, so when that movement becomes history the judgement goes with it and the new
+   * motion arrives unrated — otherwise a re-draft would quietly inherit a verdict passed on
+   * a body nobody has watched.
+   */
   recordDraft(id: number, motion: CanonicalMotion): void {
     const line = this.get(id);
     if (!line) return;
-    if (line.motion) line.history.push(line.motion);
+    if (line.motion) {
+      line.history.push(line.motion);
+      line.historyRatings.push(line.rating);
+      line.rating = null;
+    }
     line.motion = motion;
     line.state = "draft";
   }
@@ -249,19 +354,29 @@ export class Poem {
    * Nothing is dropped and nothing is summarised: a snapshot has to be able to *become*
    * this poem again, on another machine, with the service switched off. That is what makes
    * a session file the writer's own copy rather than a pointer at ours.
+   *
+   * Given `only`, it emits just those lines — and **no bake**. A bake is one continuous
+   * reading of a whole poem; a handful of lines lifted out of it were never that, and a
+   * subset carrying a bake would let a selection claim a continuity it does not have.
    */
-  toSnapshot(): PoemSnapshot {
+  toSnapshot(only?: ReadonlySet<number>): PoemSnapshot {
+    const lines = only ? this.lines.filter((line) => only.has(line.id)) : this.lines;
     return {
-      lines: this.lines.map((line) => ({
+      lines: lines.map((line) => ({
         id: line.id,
         text: line.text,
         durationSeconds: line.durationSeconds,
         state: line.state,
         motion: line.motion,
         history: [...line.history],
+        rating: line.rating,
+        historyRatings: [...line.historyRatings],
+        meta: line.meta,
       })),
-      selectedId: this.selectedId,
-      baked: this.bakedMotion,
+      selectedId: only && this.selectedId !== null && !only.has(this.selectedId)
+        ? (lines[0]?.id ?? null)
+        : this.selectedId,
+      baked: only ? null : this.bakedMotion,
     };
   }
 
@@ -279,17 +394,31 @@ export class Poem {
    * Everything else — including which lines were baked — is restored exactly as recorded.
    * `bakeIsCurrent` recomputes from the restored states, so an imported poem cannot claim
    * a continuous reading it did not have.
+   *
+   * `historyRatings` is forced back into step with `history`. It is written as a parallel
+   * array, so a hand-edited or older file can arrive with the two out of length; a rating
+   * lined up against the wrong motion would be worse than no rating at all.
    */
   static fromSnapshot(snapshot: PoemSnapshot): Poem {
     const poem = new Poem([]);
-    poem.lines = snapshot.lines.map((line) => ({
-      id: line.id,
-      text: line.text,
-      durationSeconds: line.durationSeconds,
-      state: line.state === "generating" ? (line.motion ? "stale" : "empty") : line.state,
-      motion: line.motion,
-      history: [...(line.history ?? [])],
-    }));
+    poem.lines = snapshot.lines.map((line) => {
+      const history = [...(line.history ?? [])];
+      const given = line.historyRatings ?? [];
+      // Built to length rather than truncated in place: setting `.length` leaves holes,
+      // and a hole is not the same as an explicit "never rated".
+      const ratings = Array.from({ length: history.length }, (_, at) => given[at] ?? null);
+      return {
+        id: line.id,
+        text: line.text,
+        durationSeconds: line.durationSeconds,
+        state: line.state === "generating" ? (line.motion ? "stale" : "empty") : line.state,
+        motion: line.motion,
+        history,
+        rating: line.rating ?? null,
+        historyRatings: ratings,
+        meta: line.meta ?? null,
+      };
+    });
     // The editor always needs somewhere to type.
     if (!poem.lines.length) poem.append("");
     poem.nextId = Math.max(0, ...poem.lines.map((line) => line.id)) + 1;
