@@ -121,13 +121,29 @@ that *does* have frames is passed through untouched and is not re-validated — 
 
 | | Kept where | Why |
 |---|---|---|
-| **Autosave** | The browser (IndexedDB), one slot | Insurance. A reload used to destroy the poem, and nobody remembers to export before a tab crashes. |
+| **Autosave** | The browser (IndexedDB), one session, stored in pieces | Insurance. A reload used to destroy the poem, and nobody remembers to export before a tab crashes. |
 | **Session file** | Wherever the writer puts it | Ownership. Portable, beside their notes, opens with everything switched off. |
 
 `localStorage` is deliberately not used: a session is easily past its ~5 MB ceiling, and it
 fails by throwing on write, so the poem would autosave happily for the first few generations
 and then silently stop. IndexedDB has no such ceiling and is asynchronous, so a
 multi-megabyte write does not freeze the instrument mid-performance.
+
+**The session is stored in pieces, and that is not an optimisation for its own sake.** The
+sentence above is true of the write. It is not true of the *structured clone* IndexedDB
+performs before the write, which happens on the thread drawing the body — and what that
+costs is set by the object's shape rather than its size. A rating corpus of two appended Day
+2 batches is 210 lines, 50,400 frames and something over two million small arrays.
+
+Measured on exactly that: cloning the session whole takes **828 ms**; cloning the poem with
+its motions lifted out takes **0.5 ms**. Rating one line changes a single integer, and it was
+paying for all 210 motions every 1.2 seconds.
+
+So the poem — every line, its ratings, and what each line came from — is one small record,
+rewritten whenever anything changes. Each motion is a record of its own, written once. A
+motion never changes after it is generated, so the only time one is written again is when a
+line's slot comes to hold a *different* motion: rating a line rewrites **no** motions, and
+re-drafting one rewrites exactly two — the new take, and the old one moving into history.
 
 Where the browser refuses storage entirely — a private window, blocked site data — autosave
 is **off and says so** in the session bar. It is a convenience; losing it must never take the
