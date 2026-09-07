@@ -115,7 +115,9 @@ line by line and carries from one into the next.
 
 - **Enter** starts a new line, **Backspace** at the start of a line merges it into the one
   above, **↑↓** move between lines — it behaves like a text editor, because that is what
-  writing a poem needs.
+  writing a poem needs. A long line **wraps** and the row grows to hold it, so nothing is
+  ever half-visible; the arrows walk the wrapped rows first and only then step to the next
+  line.
 - **Draft line** (`D`) generates the selected line **on its own**. Fast, and blind to its
   neighbours: the body will visibly jump where one drafted line meets the next.
 - **Bake** (`B`) generates the **whole poem in one pass**, each line conditioned on the body

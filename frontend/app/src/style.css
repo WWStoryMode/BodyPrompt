@@ -217,7 +217,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 .poem-lines { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; }
 .poem-line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 3px 4px;
   border-radius: 6px;
@@ -236,11 +236,17 @@ body.resizing { cursor: col-resize; user-select: none; }
   color: var(--ink-dim);
   font-family: var(--mono);
   font-size: 12px;
+  line-height: 1.45;
   padding: 4px 2px;
+  /* It grows to its content instead, so there is never anything hidden inside it. */
+  resize: none;
+  overflow: hidden;
+  display: block;
 }
 .poem-text:focus { color: var(--ink); }
 .poem-dur {
   width: 34px;
+  margin-top: 5px;
   background: transparent;
   border: none;
   color: var(--ink-faint);
@@ -254,7 +260,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   -webkit-appearance: none; margin: 0;
 }
 .poem-loop {
-  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  background: none; border: none; cursor: pointer; padding: 2px 4px; margin-top: 3px;
   color: var(--ink-faint); font-size: 12px; line-height: 1;
 }
 .poem-loop:hover { color: var(--ink); }
@@ -265,6 +271,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .poem-state {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   border: 1px solid var(--ink-faint); background: transparent;
+  /* Sits with the first row of a wrapped line rather than floating at its middle. */
+  margin-top: 8px;
 }
 .poem-line[data-state="generating"] .poem-state { border-color: var(--accent); opacity: .5; }
 .poem-line[data-state="draft"] .poem-state { background: var(--accent); border-color: var(--accent); opacity: .55; }

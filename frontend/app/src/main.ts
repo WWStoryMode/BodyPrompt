@@ -313,8 +313,12 @@ function buildRow(line: PoemLine): HTMLDivElement {
   const dot = document.createElement("span");
   dot.className = "poem-state";
 
-  const text = document.createElement("input");
+  // A textarea, not an input: a poem line is short but a research prompt at the explicit
+  // end of the ladder is four sentences, and a line you can only read a third of is a line
+  // you cannot judge. It grows to its content and never scrolls inside itself.
+  const text = document.createElement("textarea");
   text.className = "poem-text";
+  text.rows = 1;
   text.spellcheck = false;
   text.placeholder = "a line of the poem…";
 
@@ -332,6 +336,7 @@ function buildRow(line: PoemLine): HTMLDivElement {
   loop.title = "loop this line";
 
   text.addEventListener("input", () => {
+    fitText(text);
     poem.setText(line.id, text.value);
     // The suggestion moves with the words while the box is empty.
     duration.placeholder = String(suggestedDuration(text.value));
@@ -493,10 +498,16 @@ function renderPoem(): void {
     if (poemLinesEl.children[at] !== row) {
       poemLinesEl.insertBefore(row, poemLinesEl.children[at] ?? null);
     }
-    const text = row.querySelector<HTMLInputElement>(".poem-text")!;
+    const text = row.querySelector<HTMLTextAreaElement>(".poem-text")!;
     const duration = row.querySelector<HTMLInputElement>(".poem-dur")!;
     // Never overwrite what someone is typing.
-    if (document.activeElement !== text && text.value !== line.text) text.value = line.text;
+    if (document.activeElement !== text && text.value !== line.text) {
+      text.value = line.text;
+      // Only the lines whose text actually moved: measuring a height forces a layout, and
+      // doing it for every line on every render would put a few hundred reflows between a
+      // rating keypress and the next body appearing.
+      fitText(text);
+    }
     if (document.activeElement !== duration) {
       duration.value = line.durationSeconds === null ? "" : String(line.durationSeconds);
     }
@@ -542,14 +553,30 @@ function selectLine(id: number): void {
 }
 
 function focusLine(id: number, caret?: number): void {
-  const text = rows.get(id)?.querySelector<HTMLInputElement>(".poem-text");
+  const text = rows.get(id)?.querySelector<HTMLTextAreaElement>(".poem-text");
   if (!text) return;
   text.focus();
   if (caret !== undefined) text.setSelectionRange(caret, caret);
 }
 
+const atStart = (text: HTMLTextAreaElement): boolean =>
+  text.selectionStart === 0 && text.selectionEnd === 0;
+const atEnd = (text: HTMLTextAreaElement): boolean =>
+  text.selectionStart === text.value.length && text.selectionEnd === text.value.length;
+
+/**
+ * Grow a line to the text in it.
+ *
+ * Measured rather than calculated: how many rows a prompt wraps to depends on the rail's
+ * width, which the reader can drag, and on the font, which they may have changed.
+ */
+function fitText(text: HTMLTextAreaElement): void {
+  text.style.height = "auto";
+  text.style.height = `${text.scrollHeight}px`;
+}
+
 /** Editor keys. Enter splits, Backspace at the start merges, arrows move between lines. */
-function onLineKey(e: KeyboardEvent, id: number, text: HTMLInputElement): void {
+function onLineKey(e: KeyboardEvent, id: number, text: HTMLTextAreaElement): void {
   const index = poem.indexOf(id);
   const lines = poem.all;
   if (e.key === "Enter") {
@@ -573,10 +600,12 @@ function onLineKey(e: KeyboardEvent, id: number, text: HTMLInputElement): void {
     renderPoem();
     updateBanner();
     focusLine(previous.id, caret);
-  } else if (e.key === "ArrowUp" && lines[index - 1]) {
+  } else if (e.key === "ArrowUp" && lines[index - 1] && atStart(text)) {
+    // Only step out of the line once the caret has reached its edge — a wrapped prompt is
+    // several rows on screen, and the arrows have to walk them before leaving.
     e.preventDefault();
     focusLine(lines[index - 1].id, lines[index - 1].text.length);
-  } else if (e.key === "ArrowDown" && lines[index + 1]) {
+  } else if (e.key === "ArrowDown" && lines[index + 1] && atEnd(text)) {
     e.preventDefault();
     focusLine(lines[index + 1].id, lines[index + 1].text.length);
   } else if (e.key === "Escape") {
@@ -1200,6 +1229,10 @@ const RAIL_KEY = "bodyprompt.railWidth";
 function setRailWidth(px: number, remember = true): void {
   const width = Math.round(Math.min(RAIL_MAX, Math.max(RAIL_MIN, px)));
   document.documentElement.style.setProperty("--poem-rail", `${width}px`);
+  // The rail just changed width, so every line wraps to a different number of rows.
+  for (const row of rows.values()) {
+    fitText(row.querySelector<HTMLTextAreaElement>(".poem-text")!);
+  }
   if (!remember) return;
   // A width is a few bytes and belongs to this browser, not to the work — unlike a session,
   // which is why that one lives in IndexedDB. Storage can refuse; a rail that forgets its
@@ -1635,10 +1668,11 @@ performEl.addEventListener("click", () => setPerforming(!performing));
 // in front of an audience.
 const isTyping = (): boolean => {
   const el = document.activeElement;
-  if (el instanceof HTMLTextAreaElement) return true;
-  // A read-only input is focused, not being written in. That distinction is what lets the
+  // A read-only field is focused, not being written in. That distinction is what lets the
   // digits be the rating scale while a line still holds focus in review mode.
-  return el instanceof HTMLInputElement && !el.readOnly;
+  return (
+    (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) && !el.readOnly
+  );
 };
 
 window.addEventListener("keydown", (e) => {
