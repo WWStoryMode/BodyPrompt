@@ -49,6 +49,7 @@ hunting for a mouse in front of an audience.
 | <kbd>L</kbd> | loop the selected line alone / release it |
 | <kbd>N</kbd> | **one line** / the **whole poem** — the triptych's scope when comparing, the registers' otherwise |
 | <kbd>R</kbd> | **Read** — open / close the four notation registers |
+| <kbd>A</kbd> | **Review** — open / close rating mode |
 | <kbd>C</kbd> | **Compare** — open / close the multi-model triptych |
 | <kbd>P</kbd> | **Perform** — enter / leave performance mode |
 | <kbd>space</kbd> | play / pause |
@@ -58,6 +59,17 @@ hunting for a mouse in front of an audience.
 
 **In the poem:** <kbd>enter</kbd> starts a new line, <kbd>backspace</kbd> at the start of a
 line merges it upward, <kbd>↑</kbd><kbd>↓</kbd> move between lines.
+
+**In review mode** the lines stop accepting text, which is what frees the digits:
+
+| Key | Does |
+|---|---|
+| <kbd>0</kbd>–<kbd>4</kbd> | rate the selected line and move to the next |
+| <kbd>s</kbd> | skip — can't judge this one — and move to the next |
+| <kbd>↑</kbd><kbd>↓</kbd> | move the selection |
+| <kbd>alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> | move the *line*, up or down the poem |
+| <kbd>delete</kbd> | delete the line, asking first if it has a movement |
+| <kbd>A</kbd> / <kbd>esc</kbd> | leave |
 
 **Mouse, on the 3D stage:** drag to orbit, scroll to zoom, right-drag to pan. Standard
 three.js orbit controls.
@@ -103,7 +115,9 @@ line by line and carries from one into the next.
 
 - **Enter** starts a new line, **Backspace** at the start of a line merges it into the one
   above, **↑↓** move between lines — it behaves like a text editor, because that is what
-  writing a poem needs.
+  writing a poem needs. A long line **wraps** and the row grows to hold it, so nothing is
+  ever half-visible; the arrows walk the wrapped rows first and only then step to the next
+  line.
 - **Draft line** (`D`) generates the selected line **on its own**. Fast, and blind to its
   neighbours: the body will visibly jump where one drafted line meets the next.
 - **Bake** (`B`) generates the **whole poem in one pass**, each line conditioned on the body
@@ -113,6 +127,10 @@ line by line and carries from one into the next.
   watch it while you rewrite it.
 - **Duration** sits at the end of each line. Leave it blank and it follows the line's length;
   type a number to fix it.
+- **Drag the rail's right edge** to make it wider. A poem line is short, but an explicit
+  research prompt is four sentences, and reading one truncated is not reading it. The width
+  is remembered by this browser; double-click the edge to put it back. In performance mode
+  the rail is narrow whatever the bench was set to.
 
 The dot at the left of each line says what it is: hollow = not generated, faint amber =
 drafted alone, solid amber = baked and carrying through, dashed red = edited since it was
@@ -135,6 +153,53 @@ only add noise — the ghost-cloud compares **seeds**, the triptych compares **m
 
 *(In v0 this is a seeded perturbation, not a model sampling. See [`v0-stub.md`](v0-stub.md).)*
 
+### Review mode — <kbd>A</kbd>
+
+The instrument used on a corpus rather than on a poem. Press <kbd>A</kbd> and the rail turns
+into a rating list: the lines stop accepting text, each one grows a strip showing where it
+came from, and the digits become a scale.
+
+**One question, deliberately.** Every line is rated on how much of the cue is perceptible in
+the body that answered it — not whether the movement is good, and not whether it is complex.
+A small gesture can carry a strong relationship; an elaborate sequence can carry none.
+
+| | | |
+|---|---|---|
+| <kbd>0</kbd> | none | no relationship I can perceive |
+| <kbd>1</kbd> | faint | something, but I could be reading in |
+| <kbd>2</kbd> | partial | one aspect of the cue is legible |
+| <kbd>3</kbd> | clear | the cue is recognisable in the body |
+| <kbd>4</kbd> | strong | the body seems to answer the cue |
+| <kbd>s</kbd> | skip | can't judge this one |
+
+The anchors are on screen while you use them, because a scale whose wording drifts between
+sittings is measuring the reader rather than the movement.
+
+**Unrated is not zero.** A line nobody has judged says `unrated`; `0` is a judgement that
+there was nothing there. **Skip is not a low score** either — it is the answer for a motion
+you cannot judge, and keeping it separate is what stops "I could not tell" being counted as
+"there was nothing there". Clicking the rating a line already has clears it back to unrated.
+
+Rating advances to the next line, and **the stage plays only the line being judged** rather
+than the whole run — you are looking at one prompt against one movement.
+
+**Where a line came from** is on hover, not on screen: `PB1 · O · kimodo · seed 42`, read
+from what the file recorded about it. It is kept off the strip deliberately — it crowded the
+rating out, and it announced which rung of the ladder you were judging before you had judged
+it. The record itself travels into every export regardless, because tracing a rating back to
+its cue is the point of keeping it.
+
+**Reorder and delete.** <kbd>alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> moves a line; <kbd>delete</kbd>
+removes it, asking first if it has a movement to lose. Both obey the same rule an edit does —
+a line that moves invalidates itself and everything after it, and nothing above it — because
+a baked line is generated from the body the line before it left, and moving a line changes
+what every line below inherits.
+
+Rating a line invalidates nothing. Looking at a movement is not editing the score.
+
+Review mode is hidden in performance mode, and entering performance leaves it. Rating is
+editorial; the room is there for the body.
+
 ### Keeping the poem — the session bar
 
 At the foot of the poem rail: **Export**, **Import**, **New**, and a line saying whether
@@ -147,7 +212,18 @@ anything is being kept.
 - **Export** writes a session file: every line, every line's history, the bake, and the
   motions themselves. It is yours, it is self-contained, and it opens on another machine
   with the service switched off. Put it beside your notes.
-- **Import** opens one. A file that is not a session says so rather than half-loading.
+- **Import** opens one, replacing what is on the bench. A file that is not a session says so
+  rather than half-loading.
+- **Append** adds a file's lines to the end of this poem instead of replacing it — how a
+  rating set gets assembled out of several generated batches. Ids are renumbered so nothing
+  collides, and any bake the incoming file carried is dropped: it was a continuous reading of
+  *that* poem, and cannot be one of this longer one.
+- **Export selected** (in review mode) writes just the pairs you ticked — their prompts,
+  their movements, their ratings and where they came from — as a normal session file that
+  opens anywhere. It carries no bake, for the same reason. The button names the number it
+  will write (`Export 12 selected`), and while you are reviewing the session bar's button
+  reads **Export all**, because two export buttons a few pixels apart must not be able to be
+  confused for one another.
 - **New** starts an empty poem. It asks first, and Export is right there.
 
 If the browser refuses storage — a private window, blocked site data — the status line turns

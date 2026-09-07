@@ -17,10 +17,29 @@
  * job; keeping the browser's copy is `autosave.ts`'s.
  */
 
-import { Poem, type PoemLine, type LineState, type PoemSnapshot } from "./poem.ts";
+import {
+  Poem,
+  isRatingValue,
+  type LineMeta,
+  type LineState,
+  type PoemLine,
+  type PoemSnapshot,
+  type Rating,
+} from "./poem.ts";
 import type { CanonicalMotion } from "./types.ts";
 
-export const SESSION_SCHEMA = "bodyprompt.session/v0";
+export const SESSION_SCHEMA = "bodyprompt.session/v1";
+
+/**
+ * Formats this build can open, newest first. v1 added ratings and the per-line record a
+ * rating needs to be traceable; v0 had neither, and opens as an unrated poem.
+ *
+ * The version was bumped rather than quietly extended, and the direction that matters is
+ * the other one: a v1 file taken to an older build is **refused**, loudly, instead of
+ * opening happily and dropping every judgement in it on the way through. A file that will
+ * not open can be fixed. Work that vanished on a round trip cannot.
+ */
+const READABLE = [SESSION_SCHEMA, "bodyprompt.session/v0"];
 
 export interface Session {
   schema: string;
@@ -34,11 +53,21 @@ export class SessionError extends Error {}
 
 const STATES: LineState[] = ["empty", "generating", "draft", "baked", "stale"];
 
-export function toSession(poem: Poem, now: () => Date = () => new Date()): Session {
+export interface SessionOptions {
+  now?: () => Date;
+  /**
+   * Write only these lines. Used by "export selected": a chosen handful of prompt-movement
+   * pairs, carrying their ratings and their motions, that someone else can open and watch.
+   */
+  only?: ReadonlySet<number>;
+}
+
+export function toSession(poem: Poem, options: SessionOptions = {}): Session {
+  const { now = () => new Date(), only } = options;
   return {
     schema: SESSION_SCHEMA,
     saved_at: now().toISOString(),
-    poem: poem.toSnapshot(),
+    poem: poem.toSnapshot(only),
   };
 }
 
@@ -54,14 +83,17 @@ export function toSession(poem: Poem, now: () => Date = () => new Date()): Sessi
  * A motion is passed through untouched. It is not re-validated here — `docs/motion-schema.md`
  * is the service's contract, the renderer already refuses a motion it cannot draw, and
  * silently "fixing" a stored motion would be the one place this codebase edits a record of
- * what a model produced.
+ * what a model produced. A line's `calibration` block gets the same treatment, for the same
+ * reason: it is a record of how a motion was made, and this module does not know its shape.
+ *
+ * A v0 file opens and comes back as v1, unrated.
  */
 export function fromSession(data: unknown): Session {
   if (!data || typeof data !== "object") throw new SessionError("not a session file");
   const raw = data as Record<string, unknown>;
-  if (raw.schema !== SESSION_SCHEMA) {
+  if (typeof raw.schema !== "string" || !READABLE.includes(raw.schema)) {
     throw new SessionError(
-      `unsupported session format ${JSON.stringify(raw.schema ?? null)} — expected ${SESSION_SCHEMA}`,
+      `unsupported session format ${JSON.stringify(raw.schema ?? null)} — expected ${READABLE.join(" or ")}`,
     );
   }
   const poem = raw.poem as Record<string, unknown> | undefined;
@@ -110,7 +142,46 @@ function readLine(value: unknown, at: number): PoemLine {
     history: Array.isArray(line.history)
       ? line.history.map(motionOrNull).filter((m): m is CanonicalMotion => m !== null)
       : [],
+    rating: ratingOrNull(line.rating),
+    historyRatings: Array.isArray(line.historyRatings)
+      ? line.historyRatings.map(ratingOrNull)
+      : [],
+    // `calibration` is what the Day 2 drivers wrote; `meta` is what v1 writes. Reading both
+    // means the existing corpus opens without being rewritten first.
+    meta: metaOrNull(line.meta ?? line.calibration),
   };
+}
+
+/**
+ * A rating this build understands, or none.
+ *
+ * A value outside the scale is dropped rather than clamped. Clamping would invent a
+ * judgement nobody made; `null` says truthfully that this motion has not been rated by
+ * anyone whose scale this build shares.
+ */
+function ratingOrNull(value: unknown): Rating | null {
+  if (!value || typeof value !== "object") return null;
+  const rating = value as Record<string, unknown>;
+  if (!isRatingValue(rating.value)) return null;
+  return {
+    value: rating.value,
+    at: typeof rating.at === "string" ? rating.at : "",
+  };
+}
+
+/**
+ * The line's own record of how it was made.
+ *
+ * Not reshaped, not validated, not interpreted. The Day 2 corpus carries the cue, the
+ * prompt level, the seed and the model here — the four things that make a rating traceable
+ * back to a prompt, and without which a judgement is a number attached to nothing.
+ *
+ * It arrives under `calibration` in those files and is written back as `meta`, which is
+ * what it always was. Both are read, so the corpus opens as it stands.
+ */
+function metaOrNull(value: unknown): LineMeta | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as LineMeta;
 }
 
 function motionOrNull(value: unknown): CanonicalMotion | null {
@@ -123,17 +194,24 @@ function motionOrNull(value: unknown): CanonicalMotion | null {
     : null;
 }
 
-/** A filename that sorts by date and says what it is. */
-export function sessionFilename(session: Session, poem: Poem): string {
+/**
+ * A filename that sorts by date and says what it is.
+ *
+ * `stem` names a file that is not the whole poem — a selection — so an export of eight
+ * chosen pairs cannot be mistaken later for the session it was drawn from.
+ */
+export function sessionFilename(session: Session, poem: Poem, stem?: string): string {
   const stamp = (session.saved_at || new Date().toISOString())
     .slice(0, 16)
     .replace(/[:T]/g, "-");
   const first = poem.written[0]?.text.trim() ?? "";
   const slug =
-    first
+    stem ??
+    (first
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
-      .slice(0, 40) || "poem";
+      .slice(0, 40) ||
+      "poem");
   return `bodyprompt-${slug}-${stamp}.json`;
 }

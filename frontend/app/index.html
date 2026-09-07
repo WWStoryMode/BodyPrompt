@@ -16,6 +16,7 @@
         <span class="spacer"></span>
         <button id="registers-btn" class="chip-btn" title="Notation registers (R)">Read</button>
         <button id="triptych" class="chip-btn" title="Compare models (C)">Compare</button>
+        <button id="review-btn" class="chip-btn" title="Rate what the body made of the cue (A)">Review</button>
         <button id="perform" class="chip-btn" title="Performance mode (P)">Perform</button>
         <span id="mode-pill" class="mode-pill">Search instrument · live</span>
       </div>
@@ -70,12 +71,30 @@
       <div class="body">
         <!-- The poem: each line is a prompt, and the body carries from one into the next.
              Every line keeps its own history, so a revision never destroys what came before. -->
-        <aside class="rail rail-poem">
+        <aside id="poem-rail" class="rail rail-poem">
+          <!-- The rail carries long research prompts as well as short poem lines, so how
+               much room it gets is the reader's decision, not a number chosen here. -->
+          <div id="poem-resize" class="rail-resize" role="separator" aria-orientation="vertical"
+               title="drag to resize the poem rail"></div>
           <div class="rail-title">poem · the score</div>
           <!-- Shown whenever what is playing is not the baked poem. -->
           <div id="poem-banner" class="poem-banner hidden" role="status"></div>
           <div class="rail-scroll">
             <div id="poem-lines" class="poem-lines"></div>
+          </div>
+          <!-- The scale, on screen while it is being used. Written once, in poem.ts, and
+               rendered from there: a rating instrument whose wording drifts between
+               sittings is measuring the reader rather than the movement. -->
+          <div id="review-legend" class="review-legend"></div>
+          <!-- Choosing a handful of pairs to hand to someone else. Selection is a moment's
+               intent, not part of the work, so it is never written to a file. -->
+          <div id="review-bar" class="review-bar">
+            <span id="review-count" class="review-count"></span>
+            <button id="review-rated" class="scope-btn" title="Select every line that has been rated">Rated</button>
+            <button id="review-none" class="scope-btn" title="Clear the selection">None</button>
+            <button id="review-export" class="scope-btn" title="Export just the selected pairs">
+              Export selected
+            </button>
           </div>
           <!-- Where a search lives. The browser keeps a copy so a reload stops
                destroying the poem; the file is the writer's own, self-contained, and
@@ -85,8 +104,11 @@
             <button id="session-export" class="scope-btn" title="Save this session to a file you own">
               Export
             </button>
-            <button id="session-import" class="scope-btn" title="Open a session file">
+            <button id="session-import" class="scope-btn" title="Open a session file, replacing this one">
               Import
+            </button>
+            <button id="session-append" class="scope-btn" title="Add a session file's lines to the end of this poem">
+              Append
             </button>
             <button id="session-new" class="scope-btn" title="Start an empty poem">New</button>
             <input id="session-file" type="file" accept="application/json,.json" hidden />

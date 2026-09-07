@@ -12,7 +12,13 @@
 
 import "./style.css";
 import { StickFigureRenderer } from "./renderer";
-import { Poem, suggestedDuration, type PoemLine } from "./poem";
+import {
+  Poem,
+  RATING_ANCHORS,
+  suggestedDuration,
+  type PoemLine,
+  type RatingValue,
+} from "./poem";
 import {
   renderChronophotograph,
   renderFloorPath,
@@ -74,6 +80,10 @@ const triTitleEl = $<HTMLSpanElement>("tri-title");
 const triPhraseEl = $<HTMLSpanElement>("tri-phrase");
 const triBannerEl = $<HTMLDivElement>("tri-banner");
 const registersBtnEl = $<HTMLButtonElement>("registers-btn");
+const reviewBtnEl = $<HTMLButtonElement>("review-btn");
+const reviewLegendEl = $<HTMLDivElement>("review-legend");
+const poemRailEl = $<HTMLElement>("poem-rail");
+const poemResizeEl = $<HTMLDivElement>("poem-resize");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
@@ -82,6 +92,11 @@ const scoreScopeEl = $<HTMLButtonElement>("score-scope");
 const sessionStatusEl = $<HTMLSpanElement>("session-status");
 const sessionExportEl = $<HTMLButtonElement>("session-export");
 const sessionImportEl = $<HTMLButtonElement>("session-import");
+const sessionAppendEl = $<HTMLButtonElement>("session-append");
+const reviewCountEl = $<HTMLSpanElement>("review-count");
+const reviewRatedEl = $<HTMLButtonElement>("review-rated");
+const reviewNoneEl = $<HTMLButtonElement>("review-none");
+const reviewExportEl = $<HTMLButtonElement>("review-export");
 const sessionNewEl = $<HTMLButtonElement>("session-new");
 const sessionFileEl = $<HTMLInputElement>("session-file");
 
@@ -150,6 +165,9 @@ autosave.onStatus(({ saved, at, problem }) => {
  */
 function adoptPoem(next: Poem): void {
   poem = next;
+  // Ids are only unique within one poem, so a selection made in the last one would point at
+  // whichever lines happen to share its numbers here.
+  selected.clear();
   rows.clear();
   poemLinesEl.replaceChildren();
   loopingLineId = null;
@@ -179,34 +197,94 @@ function adoptPoem(next: Poem): void {
   }
 }
 
-function exportSession(): void {
-  const session = toSession(poem);
+/**
+ * Which lines an export will carry. UI state, never poem state: a selection is a moment's
+ * intent about what to hand to someone else, and writing it into the file would make it
+ * look like a property of the work.
+ */
+const selected = new Set<number>();
+
+function writeSession(only?: ReadonlySet<number>): void {
+  const session = toSession(poem, { only });
   const blob = new Blob([JSON.stringify(session)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = sessionFilename(session, poem);
+  link.download = sessionFilename(session, poem, only ? "selection" : undefined);
   link.click();
   URL.revokeObjectURL(url);
-  setSessionStatus(`session · exported ${link.download}`);
+  const what = only ? `${only.size} selected` : "session";
+  setSessionStatus(`${what} · exported ${link.download}`);
 }
 
-async function importSession(file: File): Promise<void> {
+function exportSelection(): void {
+  // Only lines that still exist: a selected line can be deleted out from under the set.
+  const live = new Set([...selected].filter((id) => poem.get(id)));
+  if (!live.size) {
+    setSessionStatus("nothing selected to export", true);
+    return;
+  }
+  writeSession(live);
+}
+
+/** How many are chosen, and — quietly — how much of the poem has been judged. */
+function renderReviewBar(): void {
+  const live = [...selected].filter((id) => poem.get(id)).length;
+  const rated = poem.all.filter((line) => line.rating !== null).length;
+  reviewCountEl.textContent = `${live} selected · ${rated}/${poem.size} rated`;
+  reviewExportEl.disabled = live === 0;
+  // The button says the number it will write. Two export buttons sit a few pixels apart in
+  // review mode, and one of them ignores the selection — so neither may be coy about what
+  // it does. Finding out from the file afterwards is finding out too late.
+  reviewExportEl.textContent = live ? `Export ${live} selected` : "Export selected";
+}
+
+/** Whether a file replaces the poem or joins the end of it. Two buttons, no guessing. */
+type OpenAs = "replace" | "append";
+let openAs: OpenAs = "replace";
+
+async function importSession(file: File, how: OpenAs): Promise<void> {
   try {
-    adoptPoem(restore(fromSession(JSON.parse(await file.text()))));
-    setSessionStatus(`session · opened ${file.name}`);
+    const session = fromSession(JSON.parse(await file.text()));
+    if (how === "append") {
+      const added = poem.absorb(session.poem);
+      renderPoem();
+      updateBanner();
+      showCurrent({ keepPlayhead: true });
+      setSessionStatus(`session · appended ${added.length} lines from ${file.name}`);
+    } else {
+      adoptPoem(restore(session));
+      setSessionStatus(`session · opened ${file.name}`);
+    }
   } catch (err) {
     // Never half-load. A poem missing most of itself looks exactly like a poem.
     setSessionStatus(`could not open ${file.name}: ${(err as Error).message}`, true);
   }
 }
 
-sessionExportEl.addEventListener("click", exportSession);
-sessionImportEl.addEventListener("click", () => sessionFileEl.click());
+sessionExportEl.addEventListener("click", () => writeSession());
+sessionImportEl.addEventListener("click", () => {
+  openAs = "replace";
+  sessionFileEl.click();
+});
+sessionAppendEl.addEventListener("click", () => {
+  openAs = "append";
+  sessionFileEl.click();
+});
 sessionFileEl.addEventListener("change", () => {
   const file = sessionFileEl.files?.[0];
   sessionFileEl.value = ""; // so picking the same file twice fires twice
-  if (file) void importSession(file);
+  if (file) void importSession(file, openAs);
+});
+
+reviewExportEl.addEventListener("click", exportSelection);
+reviewRatedEl.addEventListener("click", () => {
+  for (const line of poem.all) if (line.rating !== null) selected.add(line.id);
+  renderPoem();
+});
+reviewNoneEl.addEventListener("click", () => {
+  selected.clear();
+  renderPoem();
 });
 sessionNewEl.addEventListener("click", () => {
   if (!confirm("Start an empty poem? Export this one first if you want to keep it.")) return;
@@ -239,8 +317,12 @@ function buildRow(line: PoemLine): HTMLDivElement {
   const dot = document.createElement("span");
   dot.className = "poem-state";
 
-  const text = document.createElement("input");
+  // A textarea, not an input: a poem line is short but a research prompt at the explicit
+  // end of the ladder is four sentences, and a line you can only read a third of is a line
+  // you cannot judge. It grows to its content and never scrolls inside itself.
+  const text = document.createElement("textarea");
   text.className = "poem-text";
+  text.rows = 1;
   text.spellcheck = false;
   text.placeholder = "a line of the poem…";
 
@@ -258,6 +340,7 @@ function buildRow(line: PoemLine): HTMLDivElement {
   loop.title = "loop this line";
 
   text.addEventListener("input", () => {
+    fitText(text);
     poem.setText(line.id, text.value);
     // The suggestion moves with the words while the box is empty.
     duration.placeholder = String(suggestedDuration(text.value));
@@ -277,8 +360,130 @@ function buildRow(line: PoemLine): HTMLDivElement {
   loop.addEventListener("click", () => toggleLoopLine(line.id));
   row.addEventListener("dblclick", () => jumpToLine(line.id));
 
-  row.append(dot, text, duration, loop);
+  row.append(dot, text, duration, loop, buildReviewStrip(line.id));
   return row;
+}
+
+/**
+ * The reviewer's half of a line: what this movement came from, what it was judged, and the
+ * two things a corpus needs that a poem never did — reordering and removal.
+ *
+ * Built once with the row and hidden outside review mode, rather than added and removed as
+ * the mode changes: the row is reused across renders precisely so nothing is rebuilt under
+ * a caret, and that reasoning holds for these controls too.
+ */
+function buildReviewStrip(id: number): HTMLDivElement {
+  const strip = document.createElement("div");
+  strip.className = "poem-review";
+
+  const pick = document.createElement("input");
+  pick.type = "checkbox";
+  pick.className = "poem-pick";
+  pick.title = "include this pair in an export (x)";
+  pick.addEventListener("change", () => {
+    toggleSelected(id, pick.checked);
+  });
+
+  const rate = document.createElement("span");
+  rate.className = "poem-rate";
+  for (const anchor of RATING_ANCHORS) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "rate-chip";
+    chip.dataset.rating = String(anchor.value);
+    chip.textContent = anchor.value === "skip" ? "skip" : String(anchor.value);
+    chip.title = `${anchor.label} — ${anchor.meaning}`;
+    // Clicking the rating a line already has clears it: unrated has to be reachable, and
+    // it is not the same answer as 0.
+    chip.addEventListener("click", () => {
+      const has = poem.get(id)?.rating?.value;
+      rateLine(id, has === anchor.value ? null : anchor.value, { advance: false });
+    });
+    rate.append(chip);
+  }
+
+  const order = document.createElement("span");
+  order.className = "poem-order";
+  for (const [glyph, delta, what] of [
+    ["⌃", -1, "move up"],
+    ["⌄", 1, "move down"],
+  ] as const) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "poem-move";
+    button.textContent = glyph;
+    button.title = `${what} (alt+${delta < 0 ? "↑" : "↓"})`;
+    button.addEventListener("click", () => moveLine(id, delta));
+    order.append(button);
+  }
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "poem-del";
+  remove.textContent = "×";
+  remove.title = "delete this line";
+  remove.addEventListener("click", () => deleteLine(id));
+  order.append(remove);
+
+  strip.append(pick, rate, order);
+  return strip;
+}
+
+function toggleSelected(id: number, on: boolean): void {
+  if (on) selected.add(id);
+  else selected.delete(id);
+  renderPoem();
+}
+
+/**
+ * Where a line came from, for the row's tooltip.
+ *
+ * It used to sit on the strip and does not any more: on screen it crowded the rating out
+ * and told the reader which level they were judging before they had judged it. The record
+ * itself is untouched and still travels into every export — being able to trace a rating
+ * back to its cue is the point of keeping it. This is only whether it is on show.
+ */
+function metaLabel(line: PoemLine): string {
+  const meta = line.meta;
+  if (!meta) return "";
+  const parts = [meta.cue, meta.promptLevel, meta.model].filter(
+    (part) => typeof part === "string" && part,
+  );
+  if (typeof meta.seed === "number") parts.push(`seed ${meta.seed}`);
+  return parts.join(" · ");
+}
+
+function rateLine(
+  id: number,
+  value: RatingValue | null,
+  opts: { advance?: boolean } = {},
+): void {
+  poem.setRating(id, value);
+  if (opts.advance) {
+    const next = poem.all[poem.indexOf(id) + 1];
+    if (next) selectLine(next.id);
+  }
+  renderPoem();
+}
+
+function moveLine(id: number, delta: number): void {
+  if (!poem.move(id, delta)) return;
+  renderPoem();
+  updateBanner();
+  // Reordering changes what every line from here down is generated from, so what is on the
+  // stage is no longer a reading of this poem in this order.
+  showCurrent({ keepPlayhead: true });
+}
+
+function deleteLine(id: number): void {
+  const line = poem.get(id);
+  if (!line) return;
+  // Only ask when there is something to lose. A blank line is not worth a dialogue, and a
+  // generated one is minutes of a model's time plus whatever judgement it carries.
+  if (line.motion && !confirm(`Delete this line and its movement?\n\n${line.text}`)) return;
+  poem.remove(id);
+  renderPoem();
+  updateBanner();
+  showCurrent({ keepPlayhead: true });
 }
 
 function renderPoem(): void {
@@ -297,10 +502,16 @@ function renderPoem(): void {
     if (poemLinesEl.children[at] !== row) {
       poemLinesEl.insertBefore(row, poemLinesEl.children[at] ?? null);
     }
-    const text = row.querySelector<HTMLInputElement>(".poem-text")!;
+    const text = row.querySelector<HTMLTextAreaElement>(".poem-text")!;
     const duration = row.querySelector<HTMLInputElement>(".poem-dur")!;
     // Never overwrite what someone is typing.
-    if (document.activeElement !== text && text.value !== line.text) text.value = line.text;
+    if (document.activeElement !== text && text.value !== line.text) {
+      text.value = line.text;
+      // Only the lines whose text actually moved: measuring a height forces a layout, and
+      // doing it for every line on every render would put a few hundred reflows between a
+      // rating keypress and the next body appearing.
+      fitText(text);
+    }
     if (document.activeElement !== duration) {
       duration.value = line.durationSeconds === null ? "" : String(line.durationSeconds);
     }
@@ -309,7 +520,26 @@ function renderPoem(): void {
     row.classList.toggle("selected", line.id === poem.selectedId);
     row.classList.toggle("looping", loopingLineId === line.id);
     row.querySelector(".poem-state")!.setAttribute("title", STATE_TITLE[line.state] ?? "");
+
+    // A prompt being judged must not be editable by accident — and a read-only input is
+    // also what lets the digits be rating keys rather than text.
+    text.readOnly = reviewing;
+    // Provenance is on hover rather than on screen: available when asked for, and not
+    // announcing the prompt level to someone in the middle of judging the movement.
+    const label = metaLabel(line);
+    if (label) row.title = label;
+    else row.removeAttribute("title");
+    const rating = line.rating?.value ?? null;
+    row.classList.toggle("rated", rating !== null);
+    for (const chip of row.querySelectorAll<HTMLButtonElement>(".rate-chip")) {
+      chip.classList.toggle("on", rating !== null && chip.dataset.rating === String(rating));
+    }
+    const pick = row.querySelector<HTMLInputElement>(".poem-pick")!;
+    pick.checked = selected.has(line.id);
+    row.classList.toggle("picked", pick.checked);
   });
+
+  renderReviewBar();
 
   // Every mutation of the poem already comes through here, which makes this the one place
   // autosave cannot be forgotten at a new call site. `queue` is debounced and builds the
@@ -327,14 +557,30 @@ function selectLine(id: number): void {
 }
 
 function focusLine(id: number, caret?: number): void {
-  const text = rows.get(id)?.querySelector<HTMLInputElement>(".poem-text");
+  const text = rows.get(id)?.querySelector<HTMLTextAreaElement>(".poem-text");
   if (!text) return;
   text.focus();
   if (caret !== undefined) text.setSelectionRange(caret, caret);
 }
 
+const atStart = (text: HTMLTextAreaElement): boolean =>
+  text.selectionStart === 0 && text.selectionEnd === 0;
+const atEnd = (text: HTMLTextAreaElement): boolean =>
+  text.selectionStart === text.value.length && text.selectionEnd === text.value.length;
+
+/**
+ * Grow a line to the text in it.
+ *
+ * Measured rather than calculated: how many rows a prompt wraps to depends on the rail's
+ * width, which the reader can drag, and on the font, which they may have changed.
+ */
+function fitText(text: HTMLTextAreaElement): void {
+  text.style.height = "auto";
+  text.style.height = `${text.scrollHeight}px`;
+}
+
 /** Editor keys. Enter splits, Backspace at the start merges, arrows move between lines. */
-function onLineKey(e: KeyboardEvent, id: number, text: HTMLInputElement): void {
+function onLineKey(e: KeyboardEvent, id: number, text: HTMLTextAreaElement): void {
   const index = poem.indexOf(id);
   const lines = poem.all;
   if (e.key === "Enter") {
@@ -358,10 +604,12 @@ function onLineKey(e: KeyboardEvent, id: number, text: HTMLInputElement): void {
     renderPoem();
     updateBanner();
     focusLine(previous.id, caret);
-  } else if (e.key === "ArrowUp" && lines[index - 1]) {
+  } else if (e.key === "ArrowUp" && lines[index - 1] && atStart(text)) {
+    // Only step out of the line once the caret has reached its edge — a wrapped prompt is
+    // several rows on screen, and the arrows have to walk them before leaving.
     e.preventDefault();
     focusLine(lines[index - 1].id, lines[index - 1].text.length);
-  } else if (e.key === "ArrowDown" && lines[index + 1]) {
+  } else if (e.key === "ArrowDown" && lines[index + 1] && atEnd(text)) {
     e.preventDefault();
     focusLine(lines[index + 1].id, lines[index + 1].text.length);
   } else if (e.key === "Escape") {
@@ -940,9 +1188,127 @@ function setTempo(rate: number): void {
   perfTempoEl.textContent = `${rate}× tempo`;
 }
 
+/**
+ * Review mode — the instrument used on a corpus instead of on a poem.
+ *
+ * The bench is an editor, and its keys are spoken for: writing owns Enter, Backspace and
+ * the arrows, and the stage owns most of the letters. Rating a hundred motions needs a
+ * keyboard loop, so the lines go read-only and the digits become the scale. It is a mode
+ * for the same reason Read and Compare are: the instrument is doing a different job, and
+ * pretending otherwise would mean a rail crowded with controls that are wrong most of the
+ * time.
+ */
+let reviewing = false;
+
+function setReviewing(on: boolean): void {
+  reviewing = on;
+  appEl.classList.toggle("reviewing", on);
+  reviewBtnEl.classList.toggle("on", on);
+  reviewBtnEl.textContent = on ? "Done" : "Review";
+  // Beside "Export 12 selected", a button labelled only "Export" reads like the same thing.
+  sessionExportEl.textContent = on ? "Export all" : "Export";
+  sessionExportEl.title = on
+    ? "Save the whole poem — every line, not only the selected ones"
+    : "Save this session to a file you own";
+  if (on) {
+    // Whatever is focused is a line input, and it is about to stop accepting text.
+    (document.activeElement as HTMLElement | null)?.blur();
+    if (poem.selectedId === null) selectLine(poem.all[0].id);
+  }
+  renderPoem();
+  // What belongs on the stage differs between the two modes — one movement under judgement,
+  // or the run of drafts read in order — so the stage is rebuilt on the way in and out.
+  showCurrent();
+}
+
+reviewBtnEl.addEventListener("click", () => setReviewing(!reviewing));
+
+// ---- how wide the poem rail is ----
+//
+// A poem line is short. A research prompt at the explicit end of the ladder is four
+// sentences, and reading one truncated is not reading it — so the rail's width is the
+// reader's decision rather than a number chosen here. Written to a custom property so the
+// performance-mode rule still wins: in front of a room the rail is narrow whatever the
+// bench was set to.
+
+const RAIL_MIN = 220;
+const RAIL_MAX = 900;
+const RAIL_KEY = "bodyprompt.railWidth";
+
+function setRailWidth(px: number, remember = true): void {
+  const width = Math.round(Math.min(RAIL_MAX, Math.max(RAIL_MIN, px)));
+  document.documentElement.style.setProperty("--poem-rail", `${width}px`);
+  // The rail just changed width, so every line wraps to a different number of rows.
+  for (const row of rows.values()) {
+    fitText(row.querySelector<HTMLTextAreaElement>(".poem-text")!);
+  }
+  if (!remember) return;
+  // A width is a few bytes and belongs to this browser, not to the work — unlike a session,
+  // which is why that one lives in IndexedDB. Storage can refuse; a rail that forgets its
+  // width is not worth taking the instrument down for.
+  try {
+    localStorage.setItem(RAIL_KEY, String(width));
+  } catch {
+    /* private window, blocked site data — the rail simply opens at its default next time */
+  }
+}
+
+try {
+  const kept = Number(localStorage.getItem(RAIL_KEY));
+  if (Number.isFinite(kept) && kept > 0) setRailWidth(kept, false);
+} catch {
+  /* nothing kept, or nothing keepable */
+}
+
+poemResizeEl.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = poemRailEl.getBoundingClientRect().width;
+  poemResizeEl.setPointerCapture(e.pointerId);
+  poemResizeEl.classList.add("dragging");
+  document.body.classList.add("resizing");
+
+  const onMove = (move: PointerEvent) => setRailWidth(startWidth + (move.clientX - startX), false);
+  const onUp = (up: PointerEvent) => {
+    setRailWidth(startWidth + (up.clientX - startX)); // only the resting width is kept
+    poemResizeEl.classList.remove("dragging");
+    document.body.classList.remove("resizing");
+    poemResizeEl.removeEventListener("pointermove", onMove);
+    poemResizeEl.removeEventListener("pointerup", onUp);
+  };
+  poemResizeEl.addEventListener("pointermove", onMove);
+  poemResizeEl.addEventListener("pointerup", onUp);
+});
+
+// Double-click the handle to put it back, for when a drag has gone somewhere unhelpful.
+poemResizeEl.addEventListener("dblclick", () => setRailWidth(300));
+
+// The anchors come from the model rather than the markup, so there is exactly one place
+// the wording of the scale exists.
+reviewLegendEl.replaceChildren(
+  ...RATING_ANCHORS.map((anchor) => {
+    const item = document.createElement("span");
+    item.className = "legend-item";
+    const key = document.createElement("b");
+    key.textContent = anchor.value === "skip" ? "s" : String(anchor.value);
+    item.append(key, ` ${anchor.label}`);
+    item.title = anchor.meaning;
+    return item;
+  }),
+);
+
+/** Move the selection by one line, the way rating advances through a corpus. */
+function stepSelection(delta: number): void {
+  const at = poem.selectedId === null ? -1 : poem.indexOf(poem.selectedId);
+  const next = poem.all[at + delta];
+  if (next) selectLine(next.id);
+}
+
 function setPerforming(on: boolean): void {
   performing = on;
   appEl.classList.toggle("performing", on);
+  // Rating is editorial. The room is here for the body, not for someone's marking.
+  if (on && reviewing) setReviewing(false);
   renderer.setPerformanceMode(on);
 
   performEl.textContent = on ? "Exit" : "Perform";
@@ -995,17 +1361,31 @@ function showCurrent(opts: { keepPlayhead?: boolean } = {}): void {
     // The ghost-cloud is a per-line instrument: it shows the line being worked on.
     const ghosts = selected?.motion?.variants ?? [];
     current = selected?.motion ?? drafts[0];
-    // Only the lines that have actually been drafted are on the stage — a written but
-    // ungenerated line contributes no clip, so it must not shift the count either.
-    playingLines = drafted;
-    // The registers hold one clip out of the run; find where it starts in global frames.
-    const at = drafts.indexOf(current);
-    stageStart = drafts.slice(0, Math.max(0, at)).reduce((n, clip) => n + clip.frames.length, 0);
-    // Drafts are separate generations laid end to end. They have joins, not seams, and the
-    // banner already says so — marking them on the score would dress a break as a
-    // transition. A drafted register shows one line, and only that line.
-    stageBoundaries = [];
-    renderer.loadSequence(drafts, { ghosts, keepPlayhead: opts.keepPlayhead });
+
+    if (reviewing) {
+      // Reviewing judges one prompt against one movement, so the stage carries that one and
+      // nothing else. It is also what makes the loop usable: laying a whole corpus end to
+      // end would rebuild every clip's geometry on each keypress, and a hundred motions is
+      // roughly twenty-five thousand frames to walk before the next body appears.
+      playingLines = selected ? [selected] : [drafted[0]];
+      stageStart = 0;
+      stageBoundaries = [];
+      renderer.loadSequence([current], { ghosts, keepPlayhead: opts.keepPlayhead });
+    } else {
+      // Only the lines that have actually been drafted are on the stage — a written but
+      // ungenerated line contributes no clip, so it must not shift the count either.
+      playingLines = drafted;
+      // The registers hold one clip out of the run; find where it starts in global frames.
+      const at = drafts.indexOf(current);
+      stageStart = drafts
+        .slice(0, Math.max(0, at))
+        .reduce((n, clip) => n + clip.frames.length, 0);
+      // Drafts are separate generations laid end to end. They have joins, not seams, and the
+      // banner already says so — marking them on the score would dress a break as a
+      // transition. A drafted register shows one line, and only that line.
+      stageBoundaries = [];
+      renderer.loadSequence(drafts, { ghosts, keepPlayhead: opts.keepPlayhead });
+    }
   } else {
     return; // nothing generated yet — the hint is still on screen
   }
@@ -1295,19 +1675,29 @@ performEl.addEventListener("click", () => setPerforming(!performing));
 // Stage shortcuts. Ignored while typing — which, now that the instrument is an editor, is
 // most of the time. Escape always gets you out: you do not want to be hunting for a mouse
 // in front of an audience.
-const isTyping = (): boolean =>
-  document.activeElement instanceof HTMLInputElement ||
-  document.activeElement instanceof HTMLTextAreaElement;
+const isTyping = (): boolean => {
+  const el = document.activeElement;
+  // A read-only field is focused, not being written in. That distinction is what lets the
+  // digits be the rating scale while a line still holds focus in review mode.
+  return (
+    (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) && !el.readOnly
+  );
+};
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (performing) setPerforming(false);
     else if (comparing) setComparing(false);
     else if (reading) setReading(false);
+    else if (reviewing) setReviewing(false);
     else (document.activeElement as HTMLElement | null)?.blur();
     return;
   }
   if (isTyping()) return;
+
+  // Reviewing owns the keys while it is on: rating is the loop, and it has to be fast
+  // enough that judging a hundred motions is a sitting rather than an afternoon.
+  if (reviewing && reviewKey(e)) return;
 
   switch (e.key.toLowerCase()) {
     case " ":
@@ -1339,6 +1729,9 @@ window.addEventListener("keydown", (e) => {
     case "l":
       if (poem.selectedId !== null) toggleLoopLine(poem.selectedId);
       break;
+    case "a":
+      setReviewing(!reviewing);
+      break;
     case "n":
       // Both views have a scope, and only one of them is ever on screen.
       if (comparing) setTriScope(triScope === "poem" ? "line" : "poem");
@@ -1346,6 +1739,44 @@ window.addEventListener("keydown", (e) => {
       break;
   }
 });
+
+/**
+ * The rating loop. Returns true when the key was ours, so the stage shortcuts below never
+ * see it — otherwise `s` and the digits would be racing the transport.
+ */
+function reviewKey(e: KeyboardEvent): boolean {
+  const id = poem.selectedId;
+  if (id === null) return false;
+
+  if (/^[0-4]$/.test(e.key)) {
+    rateLine(id, Number(e.key) as RatingValue, { advance: true });
+    return true;
+  }
+  switch (e.key) {
+    case "s":
+    case "S":
+      rateLine(id, "skip", { advance: true });
+      return true;
+    case "x":
+    case "X":
+      toggleSelected(id, !selected.has(id));
+      return true;
+    case "ArrowUp":
+    case "ArrowDown": {
+      e.preventDefault(); // the rail scrolls otherwise, and the selection is what should move
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      if (e.altKey) moveLine(id, delta);
+      else stepSelection(delta);
+      return true;
+    }
+    case "Delete":
+    case "Backspace":
+      deleteLine(id);
+      return true;
+    default:
+      return false;
+  }
+}
 
 /**
  * Open the instrument.

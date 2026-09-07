@@ -193,11 +193,31 @@ html, body {
 .session-status.warn { color: #df8a7d; }  /* the same red the stale-bake banner uses */
 
 /* ---- the poem: each line a prompt, each with its own state ---- */
-.rail-poem { width: 300px; }
+.rail-poem { width: var(--poem-rail, 300px); position: relative; }
+/* A grab strip on the rail's edge. Wider than it looks, because a 1px target is a
+   frustration; invisible until it is wanted. */
+.rail-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+}
+.rail-resize::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+}
+.rail-resize:hover::after, .rail-resize.dragging::after { background: var(--accent); opacity: 0.5; }
+/* While dragging, nothing else should take the pointer or start selecting text. */
+body.resizing { cursor: col-resize; user-select: none; }
 .poem-lines { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; }
 .poem-line {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 3px 4px;
   border-radius: 6px;
@@ -216,11 +236,17 @@ html, body {
   color: var(--ink-dim);
   font-family: var(--mono);
   font-size: 12px;
+  line-height: 1.45;
   padding: 4px 2px;
+  /* It grows to its content instead, so there is never anything hidden inside it. */
+  resize: none;
+  overflow: hidden;
+  display: block;
 }
 .poem-text:focus { color: var(--ink); }
 .poem-dur {
   width: 34px;
+  margin-top: 5px;
   background: transparent;
   border: none;
   color: var(--ink-faint);
@@ -234,7 +260,7 @@ html, body {
   -webkit-appearance: none; margin: 0;
 }
 .poem-loop {
-  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  background: none; border: none; cursor: pointer; padding: 2px 4px; margin-top: 3px;
   color: var(--ink-faint); font-size: 12px; line-height: 1;
 }
 .poem-loop:hover { color: var(--ink); }
@@ -245,12 +271,82 @@ html, body {
 .poem-state {
   width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
   border: 1px solid var(--ink-faint); background: transparent;
+  /* Sits with the first row of a wrapped line rather than floating at its middle. */
+  margin-top: 8px;
 }
 .poem-line[data-state="generating"] .poem-state { border-color: var(--accent); opacity: .5; }
 .poem-line[data-state="draft"] .poem-state { background: var(--accent); border-color: var(--accent); opacity: .55; }
 .poem-line[data-state="baked"] .poem-state { background: var(--accent); border-color: var(--accent); }
 .poem-line[data-state="stale"] .poem-state { border-color: #df8a7d; border-style: dashed; }
 .poem-line[data-state="stale"] .poem-text { color: var(--ink-faint); font-style: italic; }
+
+/* ---- review mode: the instrument used on a corpus rather than on a poem ---- */
+
+/* The strip is a second row on the line, so the prompt itself keeps its full width. */
+.poem-review { display: none; flex-basis: 100%; align-items: center; gap: 6px; padding: 1px 0 2px 13px; }
+#app.reviewing .poem-line { flex-wrap: wrap; }
+#app.reviewing .poem-review { display: flex; }
+/* Nothing is being written here, so the caret and the duration box would only mislead. */
+#app.reviewing .poem-text { cursor: default; }
+#app.reviewing .poem-dur { opacity: 0.35; }
+
+.poem-rate { display: flex; gap: 2px; margin-left: auto; }
+/* Unrated is a state, not a zero, and it has to be visible without reading the chips. */
+#app.reviewing .poem-line:not(.rated) .poem-rate::before {
+  content: "unrated";
+  align-self: center;
+  margin-right: 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: #6f5a3a;
+}
+.rate-chip {
+  min-width: 15px;
+  padding: 1px 3px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.rate-chip:hover { color: var(--ink); border-color: var(--ink-faint); }
+.rate-chip.on { color: var(--stage); background: var(--accent); border-color: var(--accent); }
+.poem-order { display: flex; gap: 1px; }
+.poem-move, .poem-del {
+  background: none; border: none; cursor: pointer; padding: 1px 3px;
+  color: var(--ink-faint); font-size: 11px; line-height: 1;
+}
+.poem-move:hover { color: var(--ink); }
+.poem-del:hover { color: #df8a7d; }
+
+.poem-pick { margin: 0 1px 0 0; width: 11px; height: 11px; accent-color: var(--accent); cursor: pointer; }
+.poem-line.picked { background: rgba(116, 167, 200, 0.07); }
+
+.review-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+#app.reviewing .review-bar { display: flex; }
+.review-count {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+.review-bar .scope-btn:disabled { opacity: 0.35; cursor: default; }
+
+.review-legend { display: none; gap: 9px; flex-wrap: wrap; padding: 6px 10px 0; }
+#app.reviewing .review-legend { display: flex; }
+.legend-item { font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); }
+.legend-item b { color: var(--accent); font-weight: 600; }
 
 /* Never let a draft pass for the poem. */
 .poem-banner {
@@ -455,6 +551,10 @@ html, body {
 #app.performing .toggle,
 #app.performing .rail-hint,
 #app.performing .session-bar,
+#app.performing .poem-review,
+#app.performing .rail-resize,
+#app.performing .review-legend,
+#app.performing .review-bar,
 #app.performing .nota-key { display: none; }
 #app.performing .scrub { opacity: 0.35; }
 #app.performing .btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
