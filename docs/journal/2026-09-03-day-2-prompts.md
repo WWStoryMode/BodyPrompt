@@ -8,6 +8,10 @@ This document exists because Day 2 ships no session files. The motions live outs
 repository; the prompts are the part a reader needs in order to check the reasoning, or to
 run the same ladder against a different model.
 
+What the dancers did with the same cues — where that is documented, and how strongly — is
+the companion file: [Day 2 — the documented human responses](2026-09-03-day-2-human-responses.md).
+**None of it reached the models.**
+
 ## How this file was produced
 
 Not by hand. Every string below is read out of `raw.jsonl` — the record of what was
@@ -43,6 +47,16 @@ with post-processing on.
 ## Stage 2A — Pina Bausch
 
 7 cues · 35 prompts · **315 motions**
+
+| cue | source | original cue (level O) | status |
+|---|---|---|---|
+| [PB1](#pb1--wiesenland-2000) | *Wiesenland* (2000) | Trance | `verbatim-cue` |
+| [PB2](#pb2--wiesenland-2000) | *Wiesenland* (2000) | Something with strength and energy | `verbatim-cue` |
+| [PB3](#pb3--wiesenland-2000) | *Wiesenland* (2000) | How would you like others to treat you? | `verbatim-cue` |
+| [PB4](#pb4--wiesenland-2000) | *Wiesenland* (2000) | Kányádi poem about carrying someone who cannot walk and later growing wings | `source-derived-summary` |
+| [PB5](#pb5--viktor-1986) | *Viktor* (1986) | Trevi Fountain | `verbatim-cue` |
+| [PB6](#pb6--masurca-fogo-1998) | *Masurca Fogo* (1998) | Sharp turn | `verbatim-cue` |
+| [PB7](#pb7--wiesenland-2000) | *Wiesenland* (2000) | Desperate longing | `verbatim-cue` |
 
 ### PB1 — *Wiesenland* (2000)
 
@@ -218,6 +232,14 @@ with post-processing on.
 
 5 cues · 25 prompts · **225 motions**
 
+| cue | source | original cue (level O) | status |
+|---|---|---|---|
+| [DH1](#dh1--section-10--comparison-group-hay-section10) | Section 10 — comparison group `Hay-Section10` | The body remains still while joy and sorrow pass across the face; neither should… | `source-derived-score-summary` |
+| [DH2](#dh2--section-11--comparison-group-hay-section11) | Section 11 — comparison group `Hay-Section11` | Produce a wordless song combining joy and sorrow; let its rhythm generate movement and… | `source-derived-score-summary` |
+| [DH3](#dh3--sections-67--comparison-group-hay-sections6-7) | Sections 6–7 — comparison group `Hay-Sections6-7` | Choose an entrance and destination; enter with an unfamiliar stride and follow one… | `source-derived-score-summary` |
+| [DH4](#dh4--section-12--comparison-group-hay-section12) | Section 12 — comparison group `Hay-Section12` | Move across the stage in a straight line while simultaneously erasing the destination. | `source-derived-score-summary` |
+| [DH5](#dh5--later-section--comparison-group-hay-latersection-ritual) | Later section — comparison group `Hay-LaterSection-Ritual` | Return in light, tiptoe without disturbing the already-created space, experience space… | `source-derived-score-summary` |
+
 ### DH1 — Section 10 — comparison group `Hay-Section10`
 
 `source-derived-score-summary`
@@ -353,6 +375,17 @@ with post-processing on.
 ## Stage 2C — Ohad Naharin / Gaga
 
 8 cues · 40 prompts · **360 motions**
+
+| cue | source | original cue (level O) | status |
+|---|---|---|---|
+| [G1](#g1--lena) | **Lena** | Imagine an energetic source between the navel and groin, with movement able to travel… | `source-derived-cue` |
+| [G2](#g2--biba) | **Biba** | Stretch and pull the body away from the sitting bones. | `source-derived-cue` |
+| [G3](#g3--oba) | **Oba** | Imagine travelling stuff moving through the body. | `source-derived-cue` |
+| [G4](#g4--ashi) | **Ashi** | Work on the outside of the feet and let movement be generated from the knees or pelvis. | `source-derived-cue` |
+| [G5](#g5--tashi) | **Tashi** | Imagine your feet are glued to the floor. | `source-derived-cue` |
+| [G6](#g6--float) | **Float** | Let your bones float inside your flesh, as if the body were floating in a liquid. | `source-derived-cue` |
+| [G7](#g7--one-long-rope) | **One long rope** | Imagine your outstretched arms as one long rope rather than two separate arms. | `source-derived-cue` |
+| [G8](#g8--quake) | **Quake** | Find and cultivate a quake in the pelvis or centre of the body. | `source-derived-cue` |
 
 ### G1 — **Lena**
 
@@ -575,6 +608,16 @@ with post-processing on.
 ## Stage 2D — Simone Forti
 
 7 cues · 35 prompts · **315 motions**
+
+| cue | source | original cue (level O) | status |
+|---|---|---|---|
+| [SF1](#sf1--huddle) | *Huddle* | Seven to nine people form a tightly connected structure; one person at a time climbs… | `source-derived-score` |
+| [SF2](#sf2--slant-board) | *Slant Board* | Negotiate a forty-five-degree inclined board using hanging ropes. | `source-derived-score` |
+| [SF3](#sf3--hangers) | *Hangers* | Three performers stand inside hanging rope loops while four other performers walk… | `source-derived-score` |
+| [SF4](#sf4--roller-boxes) | *Roller Boxes* | Sit inside a wheeled box while another performer pulls it by an attached rope,… | `source-derived-score` |
+| [SF5](#sf5--platforms) | *Platforms* | Two performers hide separately beneath boxes and whistle tones on their exhalations. | `source-derived-score` |
+| [SF6](#sf6--see-saw) | *See Saw* | Two performers balance together on a plank mounted on a central support. | `source-derived-score` |
+| [SF7](#sf7--censor) | *Censor* | One performer sings while another performer shakes a pot containing nails or screws. | `source-derived-score` |
 
 Each of Forti's scores carries a recorded warning about what the representation
 cannot hold. They are reproduced with the cues.

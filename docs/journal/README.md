@@ -26,7 +26,9 @@ drop the practice: each directory keeps the driver that ran, the prompts parsed 
 brief, the seeds, and a full execution report, so **every motion is regenerable** from what
 is recorded. What the repository does carry is
 [every prompt Day 2 used, verbatim](2026-09-03-day-2-prompts.md) — all 135 of them, plus the
-23 calibration prompts.
+23 calibration prompts — and, in a separate file,
+[the documented human responses](2026-09-03-day-2-human-responses.md) to the same cues, none
+of which reached the models.
 
 ## How to read a measurement in these entries
 
