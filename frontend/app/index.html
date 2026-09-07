@@ -71,7 +71,11 @@
       <div class="body">
         <!-- The poem: each line is a prompt, and the body carries from one into the next.
              Every line keeps its own history, so a revision never destroys what came before. -->
-        <aside class="rail rail-poem">
+        <aside id="poem-rail" class="rail rail-poem">
+          <!-- The rail carries long research prompts as well as short poem lines, so how
+               much room it gets is the reader's decision, not a number chosen here. -->
+          <div id="poem-resize" class="rail-resize" role="separator" aria-orientation="vertical"
+               title="drag to resize the poem rail"></div>
           <div class="rail-title">poem · the score</div>
           <!-- Shown whenever what is playing is not the baked poem. -->
           <div id="poem-banner" class="poem-banner hidden" role="status"></div>

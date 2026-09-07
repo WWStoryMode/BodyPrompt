@@ -125,6 +125,10 @@ line by line and carries from one into the next.
   watch it while you rewrite it.
 - **Duration** sits at the end of each line. Leave it blank and it follows the line's length;
   type a number to fix it.
+- **Drag the rail's right edge** to make it wider. A poem line is short, but an explicit
+  research prompt is four sentences, and reading one truncated is not reading it. The width
+  is remembered by this browser; double-click the edge to put it back. In performance mode
+  the rail is narrow whatever the bench was set to.
 
 The dot at the left of each line says what it is: hollow = not generated, faint amber =
 drafted alone, solid amber = baked and carrying through, dashed red = edited since it was
@@ -177,9 +181,11 @@ you cannot judge, and keeping it separate is what stops "I could not tell" being
 Rating advances to the next line, and **the stage plays only the line being judged** rather
 than the whole run — you are looking at one prompt against one movement.
 
-**Where a line came from** is shown beside its rating: `PB1 · O · kimodo · seed 42`, read
-from what the file recorded about it. A poem written by hand has nothing to show and shows
-nothing. Without it a rating is a number attached to nothing.
+**Where a line came from** is on hover, not on screen: `PB1 · O · kimodo · seed 42`, read
+from what the file recorded about it. It is kept off the strip deliberately — it crowded the
+rating out, and it announced which rung of the ladder you were judging before you had judged
+it. The record itself travels into every export regardless, because tracing a rating back to
+its cue is the point of keeping it.
 
 **Reorder and delete.** <kbd>alt</kbd>+<kbd>↑</kbd><kbd>↓</kbd> moves a line; <kbd>delete</kbd>
 removes it, asking first if it has a movement to lose. Both obey the same rule an edit does —

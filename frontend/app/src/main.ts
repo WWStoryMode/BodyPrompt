@@ -82,6 +82,8 @@ const triBannerEl = $<HTMLDivElement>("tri-banner");
 const registersBtnEl = $<HTMLButtonElement>("registers-btn");
 const reviewBtnEl = $<HTMLButtonElement>("review-btn");
 const reviewLegendEl = $<HTMLDivElement>("review-legend");
+const poemRailEl = $<HTMLElement>("poem-rail");
+const poemResizeEl = $<HTMLDivElement>("poem-resize");
 const modePillEl = $<HTMLSpanElement>("mode-pill");
 const perfPhraseEl = $<HTMLDivElement>("perf-phrase");
 const perfTempoEl = $<HTMLSpanElement>("perf-tempo");
@@ -373,11 +375,6 @@ function buildReviewStrip(id: number): HTMLDivElement {
     toggleSelected(id, pick.checked);
   });
 
-  // What the file recorded about this line. Without it a rating is a number attached to
-  // nothing — no cue, no level, no seed, no way back to the prompt.
-  const meta = document.createElement("span");
-  meta.className = "poem-meta";
-
   const rate = document.createElement("span");
   rate.className = "poem-rate";
   for (const anchor of RATING_ANCHORS) {
@@ -418,7 +415,7 @@ function buildReviewStrip(id: number): HTMLDivElement {
   remove.addEventListener("click", () => deleteLine(id));
   order.append(remove);
 
-  strip.append(pick, meta, rate, order);
+  strip.append(pick, rate, order);
   return strip;
 }
 
@@ -428,7 +425,14 @@ function toggleSelected(id: number, on: boolean): void {
   renderPoem();
 }
 
-/** How a line describes where it came from — quiet, and absent when nothing is recorded. */
+/**
+ * Where a line came from, for the row's tooltip.
+ *
+ * It used to sit on the strip and does not any more: on screen it crowded the rating out
+ * and told the reader which level they were judging before they had judged it. The record
+ * itself is untouched and still travels into every export — being able to trace a rating
+ * back to its cue is the point of keeping it. This is only whether it is on show.
+ */
 function metaLabel(line: PoemLine): string {
   const meta = line.meta;
   if (!meta) return "";
@@ -505,10 +509,11 @@ function renderPoem(): void {
     // A prompt being judged must not be editable by accident — and a read-only input is
     // also what lets the digits be rating keys rather than text.
     text.readOnly = reviewing;
+    // Provenance is on hover rather than on screen: available when asked for, and not
+    // announcing the prompt level to someone in the middle of judging the movement.
     const label = metaLabel(line);
-    const meta = row.querySelector<HTMLSpanElement>(".poem-meta")!;
-    meta.textContent = label;
-    meta.hidden = !label; // a poem with no recorded provenance says nothing, rather than "·"
+    if (label) row.title = label;
+    else row.removeAttribute("title");
     const rating = line.rating?.value ?? null;
     row.classList.toggle("rated", rating !== null);
     for (const chip of row.querySelectorAll<HTMLButtonElement>(".rate-chip")) {
@@ -1179,6 +1184,62 @@ function setReviewing(on: boolean): void {
 }
 
 reviewBtnEl.addEventListener("click", () => setReviewing(!reviewing));
+
+// ---- how wide the poem rail is ----
+//
+// A poem line is short. A research prompt at the explicit end of the ladder is four
+// sentences, and reading one truncated is not reading it — so the rail's width is the
+// reader's decision rather than a number chosen here. Written to a custom property so the
+// performance-mode rule still wins: in front of a room the rail is narrow whatever the
+// bench was set to.
+
+const RAIL_MIN = 220;
+const RAIL_MAX = 900;
+const RAIL_KEY = "bodyprompt.railWidth";
+
+function setRailWidth(px: number, remember = true): void {
+  const width = Math.round(Math.min(RAIL_MAX, Math.max(RAIL_MIN, px)));
+  document.documentElement.style.setProperty("--poem-rail", `${width}px`);
+  if (!remember) return;
+  // A width is a few bytes and belongs to this browser, not to the work — unlike a session,
+  // which is why that one lives in IndexedDB. Storage can refuse; a rail that forgets its
+  // width is not worth taking the instrument down for.
+  try {
+    localStorage.setItem(RAIL_KEY, String(width));
+  } catch {
+    /* private window, blocked site data — the rail simply opens at its default next time */
+  }
+}
+
+try {
+  const kept = Number(localStorage.getItem(RAIL_KEY));
+  if (Number.isFinite(kept) && kept > 0) setRailWidth(kept, false);
+} catch {
+  /* nothing kept, or nothing keepable */
+}
+
+poemResizeEl.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startWidth = poemRailEl.getBoundingClientRect().width;
+  poemResizeEl.setPointerCapture(e.pointerId);
+  poemResizeEl.classList.add("dragging");
+  document.body.classList.add("resizing");
+
+  const onMove = (move: PointerEvent) => setRailWidth(startWidth + (move.clientX - startX), false);
+  const onUp = (up: PointerEvent) => {
+    setRailWidth(startWidth + (up.clientX - startX)); // only the resting width is kept
+    poemResizeEl.classList.remove("dragging");
+    document.body.classList.remove("resizing");
+    poemResizeEl.removeEventListener("pointermove", onMove);
+    poemResizeEl.removeEventListener("pointerup", onUp);
+  };
+  poemResizeEl.addEventListener("pointermove", onMove);
+  poemResizeEl.addEventListener("pointerup", onUp);
+});
+
+// Double-click the handle to put it back, for when a drag has gone somewhere unhelpful.
+poemResizeEl.addEventListener("dblclick", () => setRailWidth(300));
 
 // The anchors come from the model rather than the markup, so there is exactly one place
 // the wording of the scale exists.

@@ -193,7 +193,27 @@ html, body {
 .session-status.warn { color: #df8a7d; }  /* the same red the stale-bake banner uses */
 
 /* ---- the poem: each line a prompt, each with its own state ---- */
-.rail-poem { width: 300px; }
+.rail-poem { width: var(--poem-rail, 300px); position: relative; }
+/* A grab strip on the rail's edge. Wider than it looks, because a 1px target is a
+   frustration; invisible until it is wanted. */
+.rail-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 6;
+}
+.rail-resize::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+}
+.rail-resize:hover::after, .rail-resize.dragging::after { background: var(--accent); opacity: 0.5; }
+/* While dragging, nothing else should take the pointer or start selecting text. */
+body.resizing { cursor: col-resize; user-select: none; }
 .poem-lines { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; }
 .poem-line {
   display: flex;
@@ -262,17 +282,16 @@ html, body {
 #app.reviewing .poem-text { cursor: default; }
 #app.reviewing .poem-dur { opacity: 0.35; }
 
-.poem-meta {
+.poem-rate { display: flex; gap: 2px; margin-left: auto; }
+/* Unrated is a state, not a zero, and it has to be visible without reading the chips. */
+#app.reviewing .poem-line:not(.rated) .poem-rate::before {
+  content: "unrated";
+  align-self: center;
+  margin-right: 4px;
   font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
+  font-size: 9.5px;
+  color: #6f5a3a;
 }
-.poem-rate { display: flex; gap: 2px; }
 .rate-chip {
   min-width: 15px;
   padding: 1px 3px;
@@ -287,11 +306,6 @@ html, body {
 }
 .rate-chip:hover { color: var(--ink); border-color: var(--ink-faint); }
 .rate-chip.on { color: var(--stage); background: var(--accent); border-color: var(--accent); }
-/* Unrated is a state, not a zero — a line nobody has judged says so on its own dot. */
-#app.reviewing .poem-line:not(.rated) .poem-meta::after {
-  content: " · unrated";
-  color: #6f5a3a;
-}
 .poem-order { display: flex; gap: 1px; }
 .poem-move, .poem-del {
   background: none; border: none; cursor: pointer; padding: 1px 3px;
@@ -530,6 +544,7 @@ html, body {
 #app.performing .rail-hint,
 #app.performing .session-bar,
 #app.performing .poem-review,
+#app.performing .rail-resize,
 #app.performing .review-legend,
 #app.performing .review-bar,
 #app.performing .nota-key { display: none; }
