@@ -251,6 +251,74 @@ test("a file whose ratings do not line up with its history is repaired, not trus
   assert.deepEqual(line.historyRatings, [null]);
 });
 
+test("appending a session renumbers its lines so nothing collides", () => {
+  const host = new Poem(["first", "second"]);
+  const incoming = new Poem(["third", "fourth"]); // its ids are 1 and 2, same as the host's
+
+  host.absorb(incoming.toSnapshot());
+
+  assert.deepEqual(host.all.map((l) => l.text), ["first", "second", "third", "fourth"]);
+  assert.equal(new Set(host.all.map((l) => l.id)).size, 4); // no two lines share an id
+  assert.equal(host.get(host.all[2].id)?.text, "third"); // and each id finds its own line
+});
+
+test("an appended poem brings its ratings and its record with it", () => {
+  const host = new Poem(["first"]);
+  const incoming = new Poem(["Trance"]);
+  const id = incoming.all[0].id;
+  incoming.recordDraft(id, motion());
+  incoming.setRating(id, 3);
+  (incoming.all[0] as { meta: unknown }).meta = { cue: "PB1", promptLevel: "O" };
+
+  host.absorb(incoming.toSnapshot());
+
+  const landed = host.all[1];
+  assert.equal(landed.rating?.value, 3);
+  assert.deepEqual(landed.meta, { cue: "PB1", promptLevel: "O" });
+  assert.equal(landed.motion?.frames.length, 60);
+});
+
+test("an appended bake is dropped, and its lines stop claiming to be baked", () => {
+  const host = new Poem(["first"]);
+  host.recordDraft(host.all[0].id, motion());
+  const incoming = new Poem(["second", "third"]);
+  incoming.recordBake(baked(incoming));
+  assert.deepEqual(incoming.all.map((l) => l.state), ["baked", "baked"]);
+
+  host.absorb(incoming.toSnapshot());
+
+  // Those lines were generated from the body that preceded them in *their* poem. Here
+  // something else does, so a solid dot would be claiming a continuity that is gone.
+  assert.deepEqual(host.all.map((l) => l.state), ["draft", "empty", "empty"]);
+  assert.equal(host.bakedMotion, null); // and the reading itself was never of this poem
+});
+
+test("appending to a baked poem makes the bake stop claiming to be the poem", () => {
+  const host = new Poem(["first", "second"]);
+  host.recordBake(baked(host));
+  assert.equal(host.bakeIsCurrent, true);
+
+  host.absorb(new Poem(["third"]).toSnapshot());
+
+  assert.equal(host.bakeIsCurrent, false);
+  assert.notEqual(host.bakedMotion, null); // kept, so the stage does not go blank
+});
+
+test("appending into a fresh instrument does not leave the empty line behind", () => {
+  const host = new Poem([""]); // what New gives you
+  host.absorb(new Poem(["one", "two"]).toSnapshot());
+
+  assert.deepEqual(host.all.map((l) => l.text), ["one", "two"]);
+  assert.equal(host.selectedId, host.all[0].id); // and the selection lands somewhere real
+});
+
+test("a written line is never absorbed away, however short it is", () => {
+  const host = new Poem(["a"]);
+  host.absorb(new Poem(["b"]).toSnapshot());
+
+  assert.deepEqual(host.all.map((l) => l.text), ["a", "b"]);
+});
+
 test("a bake request carries only written lines, with their real durations", () => {
   const poem = new Poem(["first line", "", "third line here"]);
   poem.setDuration(poem.all[0].id, 4);

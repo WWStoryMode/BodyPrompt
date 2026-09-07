@@ -204,7 +204,15 @@ anything is being kept.
 - **Export** writes a session file: every line, every line's history, the bake, and the
   motions themselves. It is yours, it is self-contained, and it opens on another machine
   with the service switched off. Put it beside your notes.
-- **Import** opens one. A file that is not a session says so rather than half-loading.
+- **Import** opens one, replacing what is on the bench. A file that is not a session says so
+  rather than half-loading.
+- **Append** adds a file's lines to the end of this poem instead of replacing it — how a
+  rating set gets assembled out of several generated batches. Ids are renumbered so nothing
+  collides, and any bake the incoming file carried is dropped: it was a continuous reading of
+  *that* poem, and cannot be one of this longer one.
+- **Export selected** (in review mode) writes just the pairs you ticked — their prompts,
+  their movements, their ratings and where they came from — as a normal session file that
+  opens anywhere. It carries no bake, for the same reason.
 - **New** starts an empty poem. It asks first, and Export is right there.
 
 If the browser refuses storage — a private window, blocked site data — the status line turns

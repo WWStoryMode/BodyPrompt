@@ -90,6 +90,11 @@ const scoreScopeEl = $<HTMLButtonElement>("score-scope");
 const sessionStatusEl = $<HTMLSpanElement>("session-status");
 const sessionExportEl = $<HTMLButtonElement>("session-export");
 const sessionImportEl = $<HTMLButtonElement>("session-import");
+const sessionAppendEl = $<HTMLButtonElement>("session-append");
+const reviewCountEl = $<HTMLSpanElement>("review-count");
+const reviewRatedEl = $<HTMLButtonElement>("review-rated");
+const reviewNoneEl = $<HTMLButtonElement>("review-none");
+const reviewExportEl = $<HTMLButtonElement>("review-export");
 const sessionNewEl = $<HTMLButtonElement>("session-new");
 const sessionFileEl = $<HTMLInputElement>("session-file");
 
@@ -158,6 +163,9 @@ autosave.onStatus(({ saved, at, problem }) => {
  */
 function adoptPoem(next: Poem): void {
   poem = next;
+  // Ids are only unique within one poem, so a selection made in the last one would point at
+  // whichever lines happen to share its numbers here.
+  selected.clear();
   rows.clear();
   poemLinesEl.replaceChildren();
   loopingLineId = null;
@@ -187,34 +195,90 @@ function adoptPoem(next: Poem): void {
   }
 }
 
-function exportSession(): void {
-  const session = toSession(poem);
+/**
+ * Which lines an export will carry. UI state, never poem state: a selection is a moment's
+ * intent about what to hand to someone else, and writing it into the file would make it
+ * look like a property of the work.
+ */
+const selected = new Set<number>();
+
+function writeSession(only?: ReadonlySet<number>): void {
+  const session = toSession(poem, { only });
   const blob = new Blob([JSON.stringify(session)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = sessionFilename(session, poem);
+  link.download = sessionFilename(session, poem, only ? "selection" : undefined);
   link.click();
   URL.revokeObjectURL(url);
-  setSessionStatus(`session · exported ${link.download}`);
+  const what = only ? `${only.size} selected` : "session";
+  setSessionStatus(`${what} · exported ${link.download}`);
 }
 
-async function importSession(file: File): Promise<void> {
+function exportSelection(): void {
+  // Only lines that still exist: a selected line can be deleted out from under the set.
+  const live = new Set([...selected].filter((id) => poem.get(id)));
+  if (!live.size) {
+    setSessionStatus("nothing selected to export", true);
+    return;
+  }
+  writeSession(live);
+}
+
+/** How many are chosen, and — quietly — how much of the poem has been judged. */
+function renderReviewBar(): void {
+  const live = [...selected].filter((id) => poem.get(id)).length;
+  const rated = poem.all.filter((line) => line.rating !== null).length;
+  reviewCountEl.textContent = `${live} selected · ${rated}/${poem.size} rated`;
+  reviewExportEl.disabled = live === 0;
+}
+
+/** Whether a file replaces the poem or joins the end of it. Two buttons, no guessing. */
+type OpenAs = "replace" | "append";
+let openAs: OpenAs = "replace";
+
+async function importSession(file: File, how: OpenAs): Promise<void> {
   try {
-    adoptPoem(restore(fromSession(JSON.parse(await file.text()))));
-    setSessionStatus(`session · opened ${file.name}`);
+    const session = fromSession(JSON.parse(await file.text()));
+    if (how === "append") {
+      const added = poem.absorb(session.poem);
+      renderPoem();
+      updateBanner();
+      showCurrent({ keepPlayhead: true });
+      setSessionStatus(`session · appended ${added.length} lines from ${file.name}`);
+    } else {
+      adoptPoem(restore(session));
+      setSessionStatus(`session · opened ${file.name}`);
+    }
   } catch (err) {
     // Never half-load. A poem missing most of itself looks exactly like a poem.
     setSessionStatus(`could not open ${file.name}: ${(err as Error).message}`, true);
   }
 }
 
-sessionExportEl.addEventListener("click", exportSession);
-sessionImportEl.addEventListener("click", () => sessionFileEl.click());
+sessionExportEl.addEventListener("click", () => writeSession());
+sessionImportEl.addEventListener("click", () => {
+  openAs = "replace";
+  sessionFileEl.click();
+});
+sessionAppendEl.addEventListener("click", () => {
+  openAs = "append";
+  sessionFileEl.click();
+});
 sessionFileEl.addEventListener("change", () => {
   const file = sessionFileEl.files?.[0];
   sessionFileEl.value = ""; // so picking the same file twice fires twice
-  if (file) void importSession(file);
+  if (file) void importSession(file, openAs);
+});
+
+reviewExportEl.addEventListener("click", exportSelection);
+reviewRatedEl.addEventListener("click", () => {
+  for (const line of poem.all) if (line.rating !== null) selected.add(line.id);
+  renderPoem();
+});
+reviewNoneEl.addEventListener("click", () => {
+  selected.clear();
+  renderPoem();
 });
 sessionNewEl.addEventListener("click", () => {
   if (!confirm("Start an empty poem? Export this one first if you want to keep it.")) return;
@@ -301,6 +365,14 @@ function buildReviewStrip(id: number): HTMLDivElement {
   const strip = document.createElement("div");
   strip.className = "poem-review";
 
+  const pick = document.createElement("input");
+  pick.type = "checkbox";
+  pick.className = "poem-pick";
+  pick.title = "include this pair in an export (x)";
+  pick.addEventListener("change", () => {
+    toggleSelected(id, pick.checked);
+  });
+
   // What the file recorded about this line. Without it a rating is a number attached to
   // nothing — no cue, no level, no seed, no way back to the prompt.
   const meta = document.createElement("span");
@@ -346,8 +418,14 @@ function buildReviewStrip(id: number): HTMLDivElement {
   remove.addEventListener("click", () => deleteLine(id));
   order.append(remove);
 
-  strip.append(meta, rate, order);
+  strip.append(pick, meta, rate, order);
   return strip;
+}
+
+function toggleSelected(id: number, on: boolean): void {
+  if (on) selected.add(id);
+  else selected.delete(id);
+  renderPoem();
 }
 
 /** How a line describes where it came from — quiet, and absent when nothing is recorded. */
@@ -436,7 +514,12 @@ function renderPoem(): void {
     for (const chip of row.querySelectorAll<HTMLButtonElement>(".rate-chip")) {
       chip.classList.toggle("on", rating !== null && chip.dataset.rating === String(rating));
     }
+    const pick = row.querySelector<HTMLInputElement>(".poem-pick")!;
+    pick.checked = selected.has(line.id);
+    row.classList.toggle("picked", pick.checked);
   });
+
+  renderReviewBar();
 
   // Every mutation of the poem already comes through here, which makes this the one place
   // autosave cannot be forgotten at a new call site. `queue` is debounced and builds the
@@ -1569,6 +1652,10 @@ function reviewKey(e: KeyboardEvent): boolean {
     case "s":
     case "S":
       rateLine(id, "skip", { advance: true });
+      return true;
+    case "x":
+    case "X":
+      toggleSelected(id, !selected.has(id));
       return true;
     case "ArrowUp":
     case "ArrowDown": {

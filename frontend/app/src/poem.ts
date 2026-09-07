@@ -126,6 +126,25 @@ export function suggestedDuration(text: string): number {
   return Math.min(MAX_SECONDS, Math.max(MIN_SECONDS, seconds));
 }
 
+/**
+ * The parts of a line that travel with it whatever else changes — its takes, the judgements
+ * of those takes, and the record of where it came from.
+ *
+ * Shared by restore and absorb so the two cannot drift apart. `historyRatings` is rebuilt to
+ * `history`'s length rather than trusted: it is written as a parallel array, and a rating
+ * lined up against the wrong take would be worse than no rating at all.
+ */
+function carried(line: PoemLine): Pick<PoemLine, "history" | "historyRatings" | "rating" | "meta"> {
+  const history = [...(line.history ?? [])];
+  const given = line.historyRatings ?? [];
+  return {
+    history,
+    historyRatings: Array.from({ length: history.length }, (_, at) => given[at] ?? null),
+    rating: line.rating ?? null,
+    meta: line.meta ?? null,
+  };
+}
+
 export class Poem {
   private lines: PoemLine[] = [];
   // A plain counter, as the lineage tree used: no Date or random, so ids stay reproducible.
@@ -219,6 +238,57 @@ export class Poem {
     this.lines.splice(to, 0, line);
     this.invalidateFrom(Math.min(from, to));
     return true;
+  }
+
+  /**
+   * Add another session's lines to the end of this poem.
+   *
+   * This is how a corpus gets assembled: a rating set is several generated batches read one
+   * after another, and each of them arrives as its own file. Four things happen on the way
+   * in, and each is there to stop the merged poem claiming something untrue.
+   *
+   * - **Ids are renumbered.** They are a per-poem counter, so two files both begin at 1.
+   * - **The incoming bake is dropped.** A bake is one continuous reading of one whole poem.
+   *   It cannot be a reading of this longer one, and keeping it would leave a motion on the
+   *   stage that no line in front of you produced.
+   * - **Lines that came in `baked` are demoted.** They were generated from the body that
+   *   preceded them *in their own poem*; here something else does. A solid dot would be
+   *   claiming a continuity that no longer exists.
+   * - **A trailing blank line is absorbed rather than left behind**, so appending into a
+   *   fresh instrument does not open with a gap.
+   *
+   * The host poem's own bake needs nothing done to it: `bakeIsCurrent` already asks whether
+   * every line is baked, and these new ones are not.
+   */
+  absorb(snapshot: PoemSnapshot): PoemLine[] {
+    const tail = this.lines[this.lines.length - 1];
+    if (tail && !tail.text.trim() && !tail.motion) this.lines.pop();
+
+    const added = snapshot.lines.map((line) => {
+      const appended: PoemLine = {
+        id: this.nextId++,
+        text: line.text,
+        durationSeconds: line.durationSeconds,
+        // `generating` described a request in flight when the file was written, and `baked`
+        // described a neighbour this poem does not have. Both become what is now true.
+        state:
+          line.state === "baked" || line.state === "generating"
+            ? line.motion
+              ? "stale"
+              : "empty"
+            : line.state,
+        motion: line.motion,
+        ...carried(line),
+      };
+      this.lines.push(appended);
+      return appended;
+    });
+
+    if (!this.lines.length) this.append(""); // the editor always needs somewhere to type
+    if (this.selectedId === null || !this.lines.some((line) => line.id === this.selectedId)) {
+      this.selectedId = this.lines[0].id;
+    }
+    return added;
   }
 
   /**
@@ -401,24 +471,14 @@ export class Poem {
    */
   static fromSnapshot(snapshot: PoemSnapshot): Poem {
     const poem = new Poem([]);
-    poem.lines = snapshot.lines.map((line) => {
-      const history = [...(line.history ?? [])];
-      const given = line.historyRatings ?? [];
-      // Built to length rather than truncated in place: setting `.length` leaves holes,
-      // and a hole is not the same as an explicit "never rated".
-      const ratings = Array.from({ length: history.length }, (_, at) => given[at] ?? null);
-      return {
-        id: line.id,
-        text: line.text,
-        durationSeconds: line.durationSeconds,
-        state: line.state === "generating" ? (line.motion ? "stale" : "empty") : line.state,
-        motion: line.motion,
-        history,
-        rating: line.rating ?? null,
-        historyRatings: ratings,
-        meta: line.meta ?? null,
-      };
-    });
+    poem.lines = snapshot.lines.map((line) => ({
+      id: line.id,
+      text: line.text,
+      durationSeconds: line.durationSeconds,
+      state: line.state === "generating" ? (line.motion ? "stale" : "empty") : line.state,
+      motion: line.motion,
+      ...carried(line),
+    }));
     // The editor always needs somewhere to type.
     if (!poem.lines.length) poem.append("");
     poem.nextId = Math.max(0, ...poem.lines.map((line) => line.id)) + 1;

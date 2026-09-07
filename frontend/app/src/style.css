@@ -300,6 +300,27 @@ html, body {
 .poem-move:hover { color: var(--ink); }
 .poem-del:hover { color: #df8a7d; }
 
+.poem-pick { margin: 0 1px 0 0; width: 11px; height: 11px; accent-color: var(--accent); cursor: pointer; }
+.poem-line.picked { background: rgba(116, 167, 200, 0.07); }
+
+.review-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 0;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+#app.reviewing .review-bar { display: flex; }
+.review-count {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+.review-bar .scope-btn:disabled { opacity: 0.35; cursor: default; }
+
 .review-legend { display: none; gap: 9px; flex-wrap: wrap; padding: 6px 10px 0; }
 #app.reviewing .review-legend { display: flex; }
 .legend-item { font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); }
@@ -510,6 +531,7 @@ html, body {
 #app.performing .session-bar,
 #app.performing .poem-review,
 #app.performing .review-legend,
+#app.performing .review-bar,
 #app.performing .nota-key { display: none; }
 #app.performing .scrub { opacity: 0.35; }
 #app.performing .btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }

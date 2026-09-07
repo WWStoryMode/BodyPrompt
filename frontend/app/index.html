@@ -82,6 +82,16 @@
                rendered from there: a rating instrument whose wording drifts between
                sittings is measuring the reader rather than the movement. -->
           <div id="review-legend" class="review-legend"></div>
+          <!-- Choosing a handful of pairs to hand to someone else. Selection is a moment's
+               intent, not part of the work, so it is never written to a file. -->
+          <div id="review-bar" class="review-bar">
+            <span id="review-count" class="review-count"></span>
+            <button id="review-rated" class="scope-btn" title="Select every line that has been rated">Rated</button>
+            <button id="review-none" class="scope-btn" title="Clear the selection">None</button>
+            <button id="review-export" class="scope-btn" title="Export just the selected pairs">
+              Export selected
+            </button>
+          </div>
           <!-- Where a search lives. The browser keeps a copy so a reload stops
                destroying the poem; the file is the writer's own, self-contained, and
                opens with the service switched off. -->
@@ -90,8 +100,11 @@
             <button id="session-export" class="scope-btn" title="Save this session to a file you own">
               Export
             </button>
-            <button id="session-import" class="scope-btn" title="Open a session file">
+            <button id="session-import" class="scope-btn" title="Open a session file, replacing this one">
               Import
+            </button>
+            <button id="session-append" class="scope-btn" title="Add a session file's lines to the end of this poem">
+              Append
             </button>
             <button id="session-new" class="scope-btn" title="Start an empty poem">New</button>
             <input id="session-file" type="file" accept="application/json,.json" hidden />
