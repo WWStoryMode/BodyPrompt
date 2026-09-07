@@ -16,6 +16,7 @@
         <span class="spacer"></span>
         <button id="registers-btn" class="chip-btn" title="Notation registers (R)">Read</button>
         <button id="triptych" class="chip-btn" title="Compare models (C)">Compare</button>
+        <button id="review-btn" class="chip-btn" title="Rate what the body made of the cue (A)">Review</button>
         <button id="perform" class="chip-btn" title="Performance mode (P)">Perform</button>
         <span id="mode-pill" class="mode-pill">Search instrument · live</span>
       </div>
@@ -77,6 +78,10 @@
           <div class="rail-scroll">
             <div id="poem-lines" class="poem-lines"></div>
           </div>
+          <!-- The scale, on screen while it is being used. Written once, in poem.ts, and
+               rendered from there: a rating instrument whose wording drifts between
+               sittings is measuring the reader rather than the movement. -->
+          <div id="review-legend" class="review-legend"></div>
           <!-- Where a search lives. The browser keeps a copy so a reload stops
                destroying the poem; the file is the writer's own, self-contained, and
                opens with the service switched off. -->

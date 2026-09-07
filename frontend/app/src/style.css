@@ -252,6 +252,59 @@ html, body {
 .poem-line[data-state="stale"] .poem-state { border-color: #df8a7d; border-style: dashed; }
 .poem-line[data-state="stale"] .poem-text { color: var(--ink-faint); font-style: italic; }
 
+/* ---- review mode: the instrument used on a corpus rather than on a poem ---- */
+
+/* The strip is a second row on the line, so the prompt itself keeps its full width. */
+.poem-review { display: none; flex-basis: 100%; align-items: center; gap: 6px; padding: 1px 0 2px 13px; }
+#app.reviewing .poem-line { flex-wrap: wrap; }
+#app.reviewing .poem-review { display: flex; }
+/* Nothing is being written here, so the caret and the duration box would only mislead. */
+#app.reviewing .poem-text { cursor: default; }
+#app.reviewing .poem-dur { opacity: 0.35; }
+
+.poem-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.poem-rate { display: flex; gap: 2px; }
+.rate-chip {
+  min-width: 15px;
+  padding: 1px 3px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.rate-chip:hover { color: var(--ink); border-color: var(--ink-faint); }
+.rate-chip.on { color: var(--stage); background: var(--accent); border-color: var(--accent); }
+/* Unrated is a state, not a zero — a line nobody has judged says so on its own dot. */
+#app.reviewing .poem-line:not(.rated) .poem-meta::after {
+  content: " · unrated";
+  color: #6f5a3a;
+}
+.poem-order { display: flex; gap: 1px; }
+.poem-move, .poem-del {
+  background: none; border: none; cursor: pointer; padding: 1px 3px;
+  color: var(--ink-faint); font-size: 11px; line-height: 1;
+}
+.poem-move:hover { color: var(--ink); }
+.poem-del:hover { color: #df8a7d; }
+
+.review-legend { display: none; gap: 9px; flex-wrap: wrap; padding: 6px 10px 0; }
+#app.reviewing .review-legend { display: flex; }
+.legend-item { font-family: var(--mono); font-size: 9.5px; color: var(--ink-faint); }
+.legend-item b { color: var(--accent); font-weight: 600; }
+
 /* Never let a draft pass for the poem. */
 .poem-banner {
   margin: 8px 10px 0;
@@ -455,6 +508,8 @@ html, body {
 #app.performing .toggle,
 #app.performing .rail-hint,
 #app.performing .session-bar,
+#app.performing .poem-review,
+#app.performing .review-legend,
 #app.performing .nota-key { display: none; }
 #app.performing .scrub { opacity: 0.35; }
 #app.performing .btn { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
