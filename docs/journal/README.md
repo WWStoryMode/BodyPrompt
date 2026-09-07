@@ -24,7 +24,9 @@ directories held outside this repository — one per stage: Stage 1 calibration,
 Hay, Naharin and Forti. Day 1's promise above does not hold for it, and rather than quietly
 drop the practice: each directory keeps the driver that ran, the prompts parsed from the
 brief, the seeds, and a full execution report, so **every motion is regenerable** from what
-is recorded.
+is recorded. What the repository does carry is
+[every prompt Day 2 used, verbatim](2026-09-03-day-2-prompts.md) — all 135 of them, plus the
+23 calibration prompts.
 
 ## How to read a measurement in these entries
 
