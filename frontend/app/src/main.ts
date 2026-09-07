@@ -233,6 +233,10 @@ function renderReviewBar(): void {
   const rated = poem.all.filter((line) => line.rating !== null).length;
   reviewCountEl.textContent = `${live} selected · ${rated}/${poem.size} rated`;
   reviewExportEl.disabled = live === 0;
+  // The button says the number it will write. Two export buttons sit a few pixels apart in
+  // review mode, and one of them ignores the selection — so neither may be coy about what
+  // it does. Finding out from the file afterwards is finding out too late.
+  reviewExportEl.textContent = live ? `Export ${live} selected` : "Export selected";
 }
 
 /** Whether a file replaces the poem or joins the end of it. Two buttons, no guessing. */
@@ -1201,6 +1205,11 @@ function setReviewing(on: boolean): void {
   appEl.classList.toggle("reviewing", on);
   reviewBtnEl.classList.toggle("on", on);
   reviewBtnEl.textContent = on ? "Done" : "Review";
+  // Beside "Export 12 selected", a button labelled only "Export" reads like the same thing.
+  sessionExportEl.textContent = on ? "Export all" : "Export";
+  sessionExportEl.title = on
+    ? "Save the whole poem — every line, not only the selected ones"
+    : "Save this session to a file you own";
   if (on) {
     // Whatever is focused is a line input, and it is about to stop accepting text.
     (document.activeElement as HTMLElement | null)?.blur();

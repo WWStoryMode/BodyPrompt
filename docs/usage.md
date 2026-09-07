@@ -220,7 +220,10 @@ anything is being kept.
   *that* poem, and cannot be one of this longer one.
 - **Export selected** (in review mode) writes just the pairs you ticked — their prompts,
   their movements, their ratings and where they came from — as a normal session file that
-  opens anywhere. It carries no bake, for the same reason.
+  opens anywhere. It carries no bake, for the same reason. The button names the number it
+  will write (`Export 12 selected`), and while you are reviewing the session bar's button
+  reads **Export all**, because two export buttons a few pixels apart must not be able to be
+  confused for one another.
 - **New** starts an empty poem. It asks first, and Export is right there.
 
 If the browser refuses storage — a private window, blocked site data — the status line turns
