@@ -18,6 +18,7 @@ network, and nothing running.
 |---|---|---|
 | [Day 1](2026-08-25-day-1.md) | 2026-08-25 | Can text-to-motion AI generate *dance*, or only body movement? |
 | [Day 2](2026-09-03-day-2.md) | 2026-09-02–03 | How descriptive must a prompt become before a model answers, and what is lost on the way? |
+| [Day 3](2026-09-07-day-3.md) | 2026-09-07 | Nothing generated, 315 judged: how descriptive must a prompt be before the cue is legible in the body? |
 
 **Day 2 carries no session files.** Its corpus is 1,215 motions across 870 MB in five
 directories held outside this repository — one per stage: Stage 1 calibration, then Bausch,
@@ -29,6 +30,13 @@ is recorded. What the repository does carry is
 23 calibration prompts — and, in a separate file,
 [the documented human responses](2026-09-03-day-2-human-responses.md) to the same cues, none
 of which reached the models.
+
+**Day 3 carries no session files either, and generated no motions.** It made Day 2's corpus
+citable — the two reference documents above — built the rating instrument the second session
+said it needed (recorded in [`../roadmap.md`](../roadmap.md) as **v4b**), and used it to judge
+the first of the four practices: **315 ratings covering all of Stage 2A**, complete, in
+`~/BodyPrompt-research/2026-09-07-day3-stage2a-pina-bausch-rated/`. The entry covers 2A only
+and will be extended as Hay, Naharin and Forti are rated.
 
 ## How to read a measurement in these entries
 

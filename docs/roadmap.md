@@ -16,6 +16,7 @@ Framed by research milestone, not by feature.
 | **v3a** | **Multi-model triptych** — the comparison instrument (the *comparison* is real; the models are not yet) | ✓ done |
 | **v3** | **Three models, honestly** — SnapMoGen and Language of Motion made real, so the triptych finally compares models rather than hashes | ✓ done — all three models real, the poem is kept, the triptych reads a whole poem |
 | **v4a** | **Performance mode** — the projectable stage for the lecture-performance | ✓ done |
+| **v4b** | **The rating instrument** — a corpus of generated motion made judgeable, and the judgements kept | ✓ done — review mode, session v1, append, subset export |
 | **v4** | The public lecture performance itself — the search performed live | |
 | **v5** | Open research platform — others can search too | |
 
@@ -154,6 +155,32 @@ quietly half-built.
   models interpret the same poetic theme", and until this is fixed that answer exists only for
   as long as a browser tab does.
 
+**From Day 2 — the tool the corpus demanded:**
+
+The second research session generated 1,215 motions in an afternoon and had no way to record
+what the researcher thought of any of them. That is not a feature request; it is the point at
+which generating more stops producing evidence. Built on 2026-09-07 as **v4b**, and three
+things it exposed are worth keeping here rather than in a commit message:
+
+- **Import was discarding the record that makes a judgement mean anything.** The Day 2 stage
+  files are `bodyprompt.session/v0` and carry a `calibration` block per line — cue, prompt
+  level, seed, model. `readLine` rebuilt each line from a fixed list of known fields, so the
+  block was dropped in silence. A rating taken against that corpus would have been a number
+  with no route back to a prompt. Lines now carry `meta`, and the session format is **v1**.
+- **The stage reloaded the whole corpus on every selection change.** `showCurrent` laid every
+  drafted motion end to end, which at 105 lines is ~25,200 frames of geometry per keypress.
+  In review mode the stage carries only the line being judged — the truer reading of the task
+  as well as the faster one.
+- **Autosave paid for the whole corpus to save one integer.** IndexedDB's write is
+  asynchronous; the structured clone it performs first is not, and runs on the thread drawing
+  the body. 210 lines cloned whole took **828 ms** against **0.5 ms** for the poem with its
+  motions lifted out, so the browser's copy is now stored in pieces — the poem in one small
+  record, each motion in its own, written once.
+
+  *That figure is Node's `structuredClone`, not a browser IndexedDB `put`.* The behaviour it
+  predicts holds — a 70 MB session of 200+ motions imports, rates and reloads intact — but
+  the number itself has not been taken in a browser, and taking it there is still owed.
+
 **Deliberately not doing** — recorded so it is not mistaken for an oversight:
 
 - **Blending the seams between drafted lines.** There is no pose interpolation anywhere in
@@ -171,6 +198,22 @@ with the instrument rather than code still owed. Both wait until the system is f
   diverges from 100 by 7% of what a seed change does; whether that costs anything a dancer
   would notice is a studio judgement. The default stays at Kimodo's own 100 until it is
   made, and the step count is a control in the prompt bar for anyone testing it.
+- **Whether the rating scale is the right scale.** v4b rates one axis — how much of the cue
+  is perceptible in the body that answered it — on 0–4 with written anchors, keeping
+  `unrated`, `0` and `skip` as three different answers. The scale is shaped so the other
+  three criteria the second session floated can be added without a schema change.
+
+  **Partly answered on 2026-09-07**, by rating all 315 motions of Stage 2A and then re-rating
+  one cell. The anchors hold to within one point — 62% exact agreement on a retest — but they
+  **drift upward**: all 8 disagreements moved up, mean +0.43, and the harsher pass was the
+  earlier one, made before the rater had seen the range the corpus covers. `skip` was never
+  used in 315 judgements, and `2` was used on 11% of them against 35% zeros, so the five steps
+  are being used more like *no / weak / yes*.
+
+  What that argues for is not a different scale but a different **procedure**: a blind,
+  shuffled re-rate, and a calibration pass before a run rather than after it. Neither exists —
+  the instrument has no shuffle mode, and rating happens file by file, which means level order
+  is currently confounded with rating order.
 - **Whether the four notation registers stay legible against real motion.** They were
   designed against stub data — which turned out to mis-model leg variance by eleven to
   twenty times — and now have several metres of travel and genuine foot-contact data to
