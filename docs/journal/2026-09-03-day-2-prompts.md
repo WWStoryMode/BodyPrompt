@@ -25,8 +25,20 @@ Two invariants are asserted over all 1,215 records and hold:
 - `modelPrompt == userPrompt` on every motion.
 - `promptRewriteApplied == false` on every motion.
 
+> **Note added 2026-09-08.** `promptRewriteApplied` is written by the driver, not read from the
+> service — it exists nowhere in the codebase. It records what the driver knew rather than what
+> the pipeline reported. The claim it supports is true and was verified independently in the
+> service (`providers.py:228`) and in the SnapMoGen worker, which passes the prompt straight to
+> the sampler; but this line is an assertion, not a measurement. `modelPrompt == userPrompt` is
+> a genuine comparison of two recorded fields.
+
 **No rewriting happened anywhere in this dataset.** The prompts below are exactly what the
-models received. The ladder is the researcher's own writing — see §9 of the journal.
+models received: nothing between the authored text and the worker altered a character.
+
+The ladder itself is a translation, made before any of this ran — **O is the choreographer's
+cue, and S, Q, A and E were written from it with an LLM.** That happens outside the instrument,
+so it leaves no trace in the records these documents are built from. See §4 and §9 of the
+journal.
 
 ## The ladder
 
