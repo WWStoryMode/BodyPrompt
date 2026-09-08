@@ -181,6 +181,79 @@ things it exposed are worth keeping here rather than in a commit message:
   predicts holds — a 70 MB session of 200+ motions imports, rates and reloads intact — but
   the number itself has not been taken in a browser, and taking it there is still owed.
 
+**From Day 4 — the rewriter that is not there, and the study that should precede it:**
+
+SnapMoGen's published pipeline puts an **LLM in front of the model**. Its dataset is annotated
+with long, body-part-named captions; MoMask++ is trained on those; nobody types like that, so
+upstream expands a short user prompt into the annotation style the weights have seen. It closes
+a distribution mismatch — it is **not part of the model**, and it is not in this build.
+
+That absence is a decision this repository already recorded, at v1
+([`v1-implementation.md`](v1-implementation.md)): *silently rewriting a poetic phrase would
+introduce a second author while pretending the original prompt produced the motion.* Note the
+word **silently** — it rules out invisible rewriting, not visible rewriting.
+
+- **`promptRewriteApplied` was never a measurement.** It exists nowhere in this codebase; the
+  Day 2 driver hardcoded it `False`. Day 2's prompt appendix and Day 3 §8 both cite it as
+  evidence that no rewriting happened. The claim is true — verified independently at
+  `service/app/providers.py:228` and at `inference/snapmogen-worker/app/main.py:327`, which
+  passes `req.prompt` straight to `_sample` — but the *cited* evidence is the researcher's own
+  assertion rather than a reading from the system. Worth a footnote next time those entries
+  are touched.
+- **Kimodo's local LLM cannot be reused for this.** It is Llama-3-8B under **LLM2Vec**: loaded
+  through `AutoModel` rather than `AutoModelForCausalLM`, with no `lm_head`, bidirectional
+  attention enabled, PEFT adapters trained for embedding, and no `generate`. It pools hidden
+  states into one conditioning vector. The base `Meta-Llama-3-8B-Instruct` weights *are* on
+  disk (15 GB) and can generate — but at ~16 GB in bf16 they cannot be resident beside
+  Kimodo's 16–17 GB in 23 GB of RAM, so reuse means unloading and reloading around every
+  rewrite.
+
+**A rewriter has been running all along, off-instrument.** The ladder's derived rungs — S, Q, A
+and E — were **generated with an LLM** at authoring time, not written by hand. So what is absent
+from this build is not rewriting but a rewriting stage the instrument can *see*: nothing here
+records which model translated a cue, or under what instruction. Days 2 and 3 state the wrong
+author in their own words and are corrected separately; Day 4 §7 states it correctly.
+
+That makes recording the translation the first owed item — which model, which instruction, which
+day, for the 108 derived prompts — ahead of building anything.
+
+**Then measure the gap before building the bridge.** Level E averages 38.7 words of
+action-described physical language because an LLM was asked for that register, so the question
+is whether an *in-pipeline* rewriter would add anything to it. The study, which needs no GPU, no
+server and no API:
+
+1. Fetch **only the caption text** from the `Ericguo5513/SnapMoGen` HuggingFace dataset, whose
+   `meta_data/` already supplied `inference/snapmogen-worker/meta/{mean,std}.npy`. Inspect the
+   repo listing first — the text split's path is assumed, not known. `HF_TOKEN` never appears
+   in a shell command, and **the captions never enter this repository**: they are Snap Inc.'s
+   under a non-commercial research licence, so they live beside the other corpora in
+   `~/BodyPrompt-research/` and only computed statistics are ever committed.
+2. Put both corpora through **identical code** — the ladder's 135 prompts and the captions —
+   measuring words per text, body-part naming density per 100 words, quantification (numerals,
+   units, repetition counts), temporal markers, sentence and clause structure, subject framing,
+   and vocabulary overlap.
+3. **The set difference is the deliverable**: words frequent in the captions and absent from
+   level E are the recipe for the next rung, written by hand and costing nothing.
+
+Report effect sizes and spread, not just means — thousands of captions against 27 prompts per
+rung is not a balanced comparison, and the claim available is about *where each rung sits
+relative to the training distribution*.
+
+What follows from each outcome, so the study cannot be run without a consequence:
+
+- **E lands inside the caption distribution** → a rewriter answers a question nobody has, and
+  Day 4's negative result stands as a fact about the model rather than about phrasing.
+- **E falls short on a specific axis** → write that rung by hand, or ask for it explicitly.
+  Cheaper than an in-pipeline rewriter either way, and it puts the translation somewhere the
+  record can name.
+- **E falls short diffusely** → that is the case for building one, with evidence under it.
+
+If it is ever built, the shape chosen is **explicit and per line** — a rewrite you are shown
+and accept, edit or discard — not invisible preprocessing. That shape costs almost nothing
+architecturally: the accepted text becomes the line's text, so the motion store still keys
+correctly, the motion schema is unchanged, the session format needs no bump (a line's `meta`
+already round-trips), and `setText`'s existing invalidation is already the right behaviour.
+
 **Deliberately not doing** — recorded so it is not mistaken for an oversight:
 
 - **Blending the seams between drafted lines.** There is no pose interpolation anywhere in

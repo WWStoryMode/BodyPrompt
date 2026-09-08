@@ -19,6 +19,7 @@ network, and nothing running.
 | [Day 1](2026-08-25-day-1.md) | 2026-08-25 | Can text-to-motion AI generate *dance*, or only body movement? |
 | [Day 2](2026-09-03-day-2.md) | 2026-09-02–03 | How descriptive must a prompt become before a model answers, and what is lost on the way? |
 | [Day 3](2026-09-07-day-3.md) | 2026-09-07 | Nothing generated, 315 judged: how descriptive must a prompt be before the cue is legible in the body? |
+| [Day 4](2026-09-08-day-4.md) | 2026-09-08 | Writing a poem in the instrument: what kind of language makes a body travel? |
 
 **Day 2 carries no session files.** Its corpus is 1,215 motions across 870 MB in five
 directories held outside this repository — one per stage: Stage 1 calibration, then Bausch,
@@ -37,6 +38,11 @@ said it needed (recorded in [`../roadmap.md`](../roadmap.md) as **v4b**), and us
 the first of the four practices: **315 ratings covering all of Stage 2A**, complete, in
 `~/BodyPrompt-research/2026-09-07-day3-stage2a-pina-bausch-rated/`. The entry covers 2A only
 and will be extended as Hay, Naharin and Forti are rated.
+
+**Day 4 is a composition session, not a batch.** Thirteen bakes across nine versions of two
+poems, written iteratively in the instrument rather than driven from a brief — so there is no
+corpus directory and no execution report. Every measurement in the entry comes from the session files
+the researcher exported while writing, and each names the seed it was taken from.
 
 ## How to read a measurement in these entries
 
