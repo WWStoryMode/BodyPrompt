@@ -208,9 +208,19 @@ word **silently** — it rules out invisible rewriting, not visible rewriting.
   Kimodo's 16–17 GB in 23 GB of RAM, so reuse means unloading and reloading around every
   rewrite.
 
-**Measure the gap before building the bridge.** The ladder's level E is already a hand-made
-rewriter — 38.7 words, action-described, physical — so the question is whether an automated one
-would add anything. The study, which needs no GPU, no server and no API:
+**A rewriter has been running all along, off-instrument.** The ladder's derived rungs — S, Q, A
+and E — were **generated with an LLM** at authoring time, not written by hand. So what is absent
+from this build is not rewriting but a rewriting stage the instrument can *see*: nothing here
+records which model translated a cue, or under what instruction. Days 2 and 3 state the wrong
+author in their own words and are corrected separately; Day 4 §7 states it correctly.
+
+That makes recording the translation the first owed item — which model, which instruction, which
+day, for the 108 derived prompts — ahead of building anything.
+
+**Then measure the gap before building the bridge.** Level E averages 38.7 words of
+action-described physical language because an LLM was asked for that register, so the question
+is whether an *in-pipeline* rewriter would add anything to it. The study, which needs no GPU, no
+server and no API:
 
 1. Fetch **only the caption text** from the `Ericguo5513/SnapMoGen` HuggingFace dataset, whose
    `meta_data/` already supplied `inference/snapmogen-worker/meta/{mean,std}.npy`. Inspect the
@@ -233,8 +243,9 @@ What follows from each outcome, so the study cannot be run without a consequence
 
 - **E lands inside the caption distribution** → a rewriter answers a question nobody has, and
   Day 4's negative result stands as a fact about the model rather than about phrasing.
-- **E falls short on a specific axis** → write that rung by hand. Cheaper than a rewriter,
-  authored by the researcher, and it keeps the translation step where Day 3 §8 puts it.
+- **E falls short on a specific axis** → write that rung by hand, or ask for it explicitly.
+  Cheaper than an in-pipeline rewriter either way, and it puts the translation somewhere the
+  record can name.
 - **E falls short diffusely** → that is the case for building one, with evidence under it.
 
 If it is ever built, the shape chosen is **explicit and per line** — a rewrite you are shown
