@@ -6,6 +6,8 @@ The deck as delivered, kept as a record rather than as a document that tracks th
 |---|---|
 | [2026-09-09-lecture-performance-deck.html](2026-09-09-lecture-performance-deck.html) | The lecture-performance deck, presented 2026-09-09 |
 
+The site's landing page is [`../index.html`](../index.html) — deck, instrument and journal.
+
 ## Viewing it
 
 It is a single self-contained HTML file — sixteen slides, arrow keys or space to navigate.

@@ -1,0 +1,80 @@
+# Publish the site: the docs verbatim, plus the instrument built from source.
+#
+# The build happens here rather than being committed. A checked-in bundle drifts from the
+# code silently — a deployed app older than the repository is exactly the kind of drift
+# docs/v0-stub.md exists to prevent, and nobody would notice it for weeks.
+#
+# This workflow owns everything Pages serves. `docs/` is copied first and whole, so the deck,
+# the journal and the session files keep the URLs they already have; the app is added beside
+# them. Getting step order wrong here takes the published deck down with it.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # so it can be proved on a branch before main depends on it
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; never cancel one midway and leave the site half-written.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm, not npm: `npm install` fails in this repository on a pre-existing
+      # typescript-eslint peer conflict, while the pnpm lockfile resolves cleanly.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/app/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: frontend/app
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        working-directory: frontend/app
+        run: pnpm test
+
+      # `tsc && vite build`. vite.config.ts sets base to /BodyPrompt/app/ for builds only.
+      - name: Build the instrument
+        working-directory: frontend/app
+        run: pnpm build
+
+      - name: Assemble the site
+        run: |
+          # docs first and whole — .nojekyll included, so every file is served exactly as
+          # committed and the deck reaches a browser byte-for-byte as it was presented.
+          cp -r docs _site
+          test -f _site/.nojekyll || { echo "docs/.nojekyll missing — Jekyll would rewrite the site"; exit 1; }
+          test -f _site/presentation/2026-09-09-lecture-performance-deck.html || { echo "the deck did not make it into the artifact"; exit 1; }
+          mkdir -p _site/app
+          cp -r frontend/app/dist/. _site/app/
+          test -f _site/app/index.html || { echo "the instrument did not build"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

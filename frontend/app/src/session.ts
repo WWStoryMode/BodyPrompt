@@ -116,6 +116,32 @@ export function fromSession(data: unknown): Session {
   };
 }
 
+/**
+ * Where a `?session=` boot flag is allowed to read from.
+ *
+ * The flag exists so a link can open a particular poem — a reviewer with no GPU and nothing
+ * running can be sent straight to the movement rather than to a tool and a download. That
+ * makes it a URL somebody else can choose, so it is confined to **this site**: a relative
+ * path resolves, anything that reaches another origin is refused.
+ *
+ * Refusing rather than silently ignoring matters. A link that quietly opens the wrong poem,
+ * or no poem, is worse than one that says it will not be followed.
+ */
+export function sessionUrl(value: string, base: string): string {
+  let resolved: URL;
+  try {
+    resolved = new URL(value, base);
+  } catch {
+    throw new SessionError(`not a usable session path: ${JSON.stringify(value)}`);
+  }
+  if (resolved.origin !== new URL(base).origin) {
+    throw new SessionError(
+      `a session link may only point inside this site, not at ${resolved.origin}`,
+    );
+  }
+  return resolved.href;
+}
+
 /** A session's poem, ready to put on the stage. */
 export function restore(session: Session): Poem {
   return Poem.fromSnapshot(session.poem);
