@@ -312,6 +312,7 @@ Open <http://localhost:5173>, type a phrase, press **Generate**.
 | [`docs/abstract.md`](docs/abstract.md) | The accepted abstract — the canonical framing and vocabulary |
 | [`docs/journal/`](docs/journal/) | **The research journal** — what the instrument has been asked, and what it did |
 | [`docs/lecture-performance.md`](docs/lecture-performance.md) | The live performance this is all built for |
+| [`docs/presentation/`](docs/presentation/) | The lecture-performance deck as delivered — a dated record, not a maintained document |
 | [`docs/architecture.md`](docs/architecture.md) | The adapter pattern, the stack, running the real models |
 | [`docs/roadmap.md`](docs/roadmap.md) | Versions, parked items, and questions left open |
 | [`docs/usage.md`](docs/usage.md) | The full guide to the instrument |

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BodyPrompt — Prompting as Choreographic Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c10; --ink:#f2ede3; --ink-dim:#9aa0a6; --amber:#e9b872;
+    --line:#23262b; --teal:#6b8a8f;
+    --serif:'Newsreader', Georgia, 'Times New Roman', serif;
+    --mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); -webkit-font-smoothing:antialiased;
+    padding:clamp(32px,7vw,96px) clamp(24px,7vw,120px);
+    line-height:1.5;
+  }
+  .wrap{max-width:760px;}
+  .kicker{font-family:var(--mono); font-size:12px; letter-spacing:.02em; color:var(--amber); margin-bottom:18px;}
+  h1{font-weight:500; font-size:clamp(30px,4.6vw,54px); line-height:1.08; margin:0 0 18px; max-width:16ch;}
+  h1 em{font-style:italic; color:var(--amber);}
+  .sub{font-family:var(--mono); font-size:clamp(13px,1.1vw,15px); color:var(--ink-dim); max-width:58ch; line-height:1.65;}
+  h2{font-family:var(--mono); font-weight:500; font-size:12px; color:var(--amber);
+     letter-spacing:.04em; text-transform:uppercase; margin:52px 0 4px;}
+  a.card{
+    display:block; text-decoration:none; color:inherit;
+    border-top:1px solid var(--line); padding:16px 0;
+  }
+  a.card:last-of-type{border-bottom:1px solid var(--line);}
+  a.card .t{font-size:19px; color:var(--ink);}
+  a.card .d{font-family:var(--mono); font-size:12.5px; color:var(--ink-dim); margin-top:4px; max-width:60ch;}
+  a.card:hover .t, a.card:focus-visible .t{color:var(--amber);}
+  a.card:focus-visible{outline:2px solid var(--amber); outline-offset:3px;}
+  .note{
+    font-family:var(--mono); font-size:12.5px; color:var(--teal); line-height:1.7;
+    border:1px dashed var(--line); padding:14px 16px; margin-top:16px; max-width:62ch;
+  }
+  .note b{color:var(--ink);}
+  footer{font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); margin-top:64px;}
+  footer a{color:var(--ink-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">INTO STORYMODE</div>
+  <h1>BodyPrompt<br><em>Prompting as Choreographic Search</em></h1>
+  <p class="sub">
+    A practice-based research project on poetic language, AI motion generation, and
+    choreographic selection. Can a poem move a machine the way a choreographer moves a dancer —
+    through image and metaphor rather than instruction?
+  </p>
+
+  <h2>Read</h2>
+  <a class="card" href="presentation/2026-09-09-lecture-performance-deck.html">
+    <div class="t">The lecture-performance deck</div>
+    <div class="d">As delivered, 2026-09-09. Sixteen slides; arrow keys or space to navigate.</div>
+  </a>
+  <a class="card" href="https://github.com/WWStoryMode/BodyPrompt/tree/main/docs/journal">
+    <div class="t">The research journal</div>
+    <div class="d">Four days: what the instrument was asked, and what it did. Findings and preferences, not a defect list. Reads on GitHub, where the links between entries resolve.</div>
+  </a>
+
+  <h2>Open</h2>
+  <a class="card" href="app/">
+    <div class="t">The instrument</div>
+    <div class="d">The poem editor, the stage, the four notation registers, the model triptych, and the rating tool.</div>
+  </a>
+  <a class="card" href="app/?session=../journal/data/2026-09-08/poem-writing-006.json">
+    <div class="t">A poem that does not travel</div>
+    <div class="d">Fire, a rocking floor, water. No human body named anywhere — the most articulate motion of that day, and 2 cm of travel in 35 seconds.</div>
+  </a>
+  <a class="card" href="app/?session=../journal/data/2026-09-08/poem-writing-007a.json">
+    <div class="t">The same imagery, made explicit</div>
+    <div class="d">The same five images rewritten as named actions. Line three runs 9.51 m where the poem above managed 0.38 m.</div>
+  </a>
+
+  <div class="note">
+    <b>Nothing here generates motion.</b> That needs a GPU and three model workers running on
+    your own machine, and this is a static site. What does work, with nothing installed: opening
+    a saved session and watching every body in it, scrubbing it, reading the notation, and
+    rating it. The motions are inside the files.<br><br>
+    Press <b>Generate</b> or <b>Bake</b> and the instrument will tell you the service is absent
+    rather than pretending otherwise.
+  </div>
+
+  <footer>
+    <a href="https://github.com/WWStoryMode/BodyPrompt">github.com/WWStoryMode/BodyPrompt</a>
+    · William Wong
+  </footer>
+</div>
+</body>
+</html>

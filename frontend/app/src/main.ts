@@ -29,7 +29,7 @@ import type { RegisterView } from "./notation";
 import type { CanonicalMotion } from "./types";
 import { openAutosave } from "./autosave";
 import { askFor, continuityLabel, readPanel } from "./triptych";
-import { fromSession, restore, sessionFilename, toSession } from "./session";
+import { SessionError, fromSession, restore, sessionFilename, sessionUrl, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
 const API_BASE = "http://localhost:8000";
@@ -1581,10 +1581,11 @@ async function bake(): Promise<void> {
 }
 
 /** The backend, not static HTML, is the source of truth about what is real. */
-async function refreshCapabilities(): Promise<void> {
+async function refreshCapabilities(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/health`);
-    if (!res.ok) return;
+    // Reachable but unhappy is still no service worth drafting into.
+    if (!res.ok) return false;
     const health = (await res.json()) as { capabilities?: Capability[] };
     for (const capability of health.capabilities ?? []) {
       capabilities.set(capability.model, capability);
@@ -1602,9 +1603,31 @@ async function refreshCapabilities(): Promise<void> {
     // The banner is a claim about what these panels are, so it is rebuilt from what the
     // service just said rather than left as a sentence somebody typed once.
     updateTriptychBanner();
+    return true;
   } catch {
-    // Generate owns the full actionable service error; leave "checking…" honest here.
+    // Generate owns the full actionable service error, but silence here would leave the
+    // model list reading like a working instrument. Say the service is not there.
+    return false;
   }
+}
+
+/** Is any model actually able to answer right now? */
+const anyModelReady = (): boolean =>
+  [...capabilities.values()].some((capability) => capability.ready);
+
+/**
+ * What the stage says when there is no service to generate with.
+ *
+ * A build served as a static page — GitHub Pages, a colleague's laptop — has no workers and
+ * never will. Opening a session still works completely: the motions are in the file. So the
+ * hint stops instructing someone to press Draft and tells them the one thing that does work.
+ */
+function offerImportInstead(): void {
+  hintEl.classList.remove("hidden");
+  hintEl.innerHTML =
+    "No motion service is running, so nothing can be generated here.<br>" +
+    "<b>Import</b> a session file and it plays with nothing loaded — the motions are in the file.<br>" +
+    "<code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>";
 }
 
 // ---- events ----
@@ -1790,7 +1813,40 @@ function reviewKey(e: KeyboardEvent): boolean {
  * and no request made. Only a genuinely fresh start drafts its first line so the stage is
  * not empty. Bake stays a deliberate act, as it always has.
  */
+/**
+ * Open a poem named in the URL — `?session=…`.
+ *
+ * A link, rather than a tool and a download. Somebody sent a URL and that is what should be
+ * on the stage, so this beats the browser's own copy: a returning visitor's autosaved poem
+ * must not silently win over the poem they were sent.
+ *
+ * Failure is said out loud in the session bar, never swallowed. A link that quietly opens
+ * the wrong thing is worse than one that refuses.
+ */
+async function openLinkedSession(value: string): Promise<boolean> {
+  try {
+    const url = sessionUrl(value, location.href);
+    const res = await fetch(url);
+    if (!res.ok) throw new SessionError(`could not fetch it (${res.status})`);
+    adoptPoem(restore(fromSession(await res.json())));
+    setSessionStatus(`session · opened from link`);
+    return true;
+  } catch (err) {
+    setSessionStatus(`could not open the linked session: ${(err as Error).message}`, true);
+    return false;
+  }
+}
+
 async function start(): Promise<void> {
+  const linked = new URLSearchParams(location.search).get("session");
+  if (linked) {
+    // `adoptPoem` has already put it on the stage, and autosave will keep it from here.
+    if (await openLinkedSession(linked)) {
+      await refreshCapabilities();
+      return;
+    }
+  }
+
   const stored = await autosave.load();
   let restored = false;
   if (stored) {
@@ -1814,9 +1870,16 @@ async function start(): Promise<void> {
     setSessionStatus("session · new");
   }
 
-  await refreshCapabilities();
-  if (restored) showCurrent();
-  else void draftLine();
+  const serviceUp = await refreshCapabilities();
+  if (restored) {
+    showCurrent();
+  } else if (serviceUp && anyModelReady()) {
+    // Only a genuinely fresh start with something to answer it drafts its first line.
+    void draftLine();
+  } else {
+    // Drafting into a service that cannot answer produces an error and nothing else.
+    offerImportInstead();
+  }
 }
 
 void start();
@@ -1824,6 +1887,9 @@ void start();
 // Boot flags: ?perform=1 goes straight to the projectable stage (for plugging into a
 // projector without fumbling through chrome in front of a room); ?compare=1 opens the
 // triptych; ?registers=1 opens the four notation registers.
+//
+// ?session=<relative path> is handled in `start()` instead, because it has to beat the
+// autosave restore — by the time this block runs there is already a poem on the stage.
 const boot = new URLSearchParams(location.search);
 if (boot.has("perform")) setPerforming(true);
 if (boot.has("compare")) setComparing(true);

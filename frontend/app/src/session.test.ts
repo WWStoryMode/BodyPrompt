@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { Poem } from "./poem.ts";
-import { SESSION_SCHEMA, SessionError, fromSession, restore, sessionFilename, toSession } from "./session.ts";
+import { SESSION_SCHEMA, SessionError, fromSession, restore, sessionFilename, sessionUrl, toSession } from "./session.ts";
 import type { CanonicalMotion } from "./types.ts";
 
 function motion(seed = 1, frames = 30): CanonicalMotion {
@@ -193,6 +193,28 @@ test("a selection names itself, so it cannot be mistaken for the session it came
     sessionFilename(session, poem, "selection"),
     "bodyprompt-selection-2026-09-07-11-02.json",
   );
+});
+
+test("a session link may point inside this site", () => {
+  const here = "https://wwstorymode.github.io/BodyPrompt/app/";
+
+  assert.equal(
+    sessionUrl("../journal/data/poem-007a.json", here),
+    "https://wwstorymode.github.io/BodyPrompt/journal/data/poem-007a.json",
+  );
+  assert.equal(
+    sessionUrl("/BodyPrompt/journal/data/poem-006.json", here),
+    "https://wwstorymode.github.io/BodyPrompt/journal/data/poem-006.json",
+  );
+});
+
+test("a session link may not point anywhere else", () => {
+  const here = "https://wwstorymode.github.io/BodyPrompt/app/";
+
+  // A boot flag is a URL someone else can choose. Refusing is the whole point.
+  assert.throws(() => sessionUrl("https://evil.example/x.json", here), SessionError);
+  assert.throws(() => sessionUrl("//evil.example/x.json", here), SessionError); // protocol-relative
+  assert.throws(() => sessionUrl("http://wwstorymode.github.io/x.json", here), SessionError); // scheme differs
 });
 
 test("a session carries the whole poem, not a summary of it", () => {
