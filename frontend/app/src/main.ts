@@ -32,7 +32,34 @@ import { askFor, continuityLabel, readPanel } from "./triptych";
 import { SessionError, fromSession, restore, sessionFilename, sessionUrl, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
-const API_BASE = "http://localhost:8000";
+//
+// `?service` opts a published build in to looking for one — see `serviceExpected` below.
+const SERVICE_PORT = (() => {
+  const asked = new URLSearchParams(location.search).get("service");
+  // Digits only, and only a port. A boot flag is a URL somebody else can choose, and this
+  // one decides what the page connects to; an arbitrary address here would be theirs to aim.
+  return asked && /^\d{2,5}$/.test(asked) ? asked : "8000";
+})();
+const API_BASE = `http://localhost:${SERVICE_PORT}`;
+
+/**
+ * Should this page go looking for a motion service at all?
+ *
+ * Served from the machine the service runs on — a dev server, or a file — it should: that is
+ * the instrument in its normal use. **Served from the public web it must not.** A page on
+ * `https://…github.io` reaching for `http://localhost` is a public origin touching a private
+ * address, and browsers now stop and ask the visitor to allow "access to other apps and
+ * services on this device". That prompt is alarming, it is unrelated to anything they came
+ * for, and the answer would have been "there is no service" either way.
+ *
+ * So a published build stays quiet unless someone asks with `?service`. Anyone actually
+ * running the stack can still drive it from the published UI — they just have to say so,
+ * which is the right way round: the permission prompt then answers a question they asked.
+ */
+const serviceExpected = (): boolean =>
+  location.protocol === "file:" ||
+  ["localhost", "127.0.0.1", "[::1]", "::1", ""].includes(location.hostname) ||
+  new URLSearchParams(location.search).has("service");
 
 // How many motions one prompt returns: the primary + (VARIANTS - 1) ghosts.
 const VARIANTS = 4;
@@ -1507,6 +1534,17 @@ function generationFailed(err: unknown, keeping: string): void {
 }
 
 async function post(body: unknown): Promise<CanonicalMotion> {
+  // Every route to the service comes through here — drafting, baking, the triptych. A
+  // published build refuses before the fetch rather than after it: reaching localhost from a
+  // public page is what raises the browser's "access other apps on this device" prompt, and
+  // asking that of someone who pressed Generate on a page that has already told them there is
+  // no service would be asking for permission to fail.
+  if (!serviceExpected()) {
+    throw new Error(
+      "this published copy has no motion service behind it — import a session file to watch " +
+        "movement, or run the stack locally and add ?service to the address",
+    );
+  }
   const res = await fetch(`${API_BASE}/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -1624,10 +1662,15 @@ const anyModelReady = (): boolean =>
  */
 function offerImportInstead(): void {
   hintEl.classList.remove("hidden");
-  hintEl.innerHTML =
-    "No motion service is running, so nothing can be generated here.<br>" +
-    "<b>Import</b> a session file and it plays with nothing loaded — the motions are in the file.<br>" +
-    "<code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>";
+  hintEl.innerHTML = serviceExpected()
+    ? "No motion service is running, so nothing can be generated here.<br>" +
+      "<b>Import</b> a session file and it plays with nothing loaded — the motions are in the file.<br>" +
+      "<code>cd service &amp;&amp; uv run uvicorn app.main:app --port 8000</code>"
+    : // Published build. It has not looked for a service and will not without being asked.
+      "This is a published copy, so there is no motion service behind it and nothing here " +
+      "generates movement.<br><b>Import</b> a session file — or open one by link — and it " +
+      "plays with nothing loaded at all; the motions are inside the file.<br>" +
+      "Running the stack locally? Add <code>?service</code> to the address to connect to it.";
 }
 
 // ---- events ----
@@ -1842,7 +1885,7 @@ async function start(): Promise<void> {
   if (linked) {
     // `adoptPoem` has already put it on the stage, and autosave will keep it from here.
     if (await openLinkedSession(linked)) {
-      await refreshCapabilities();
+      if (serviceExpected()) await refreshCapabilities();
       return;
     }
   }
@@ -1870,7 +1913,7 @@ async function start(): Promise<void> {
     setSessionStatus("session · new");
   }
 
-  const serviceUp = await refreshCapabilities();
+  const serviceUp = serviceExpected() ? await refreshCapabilities() : false;
   if (restored) {
     showCurrent();
   } else if (serviceUp && anyModelReady()) {
