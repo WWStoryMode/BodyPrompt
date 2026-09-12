@@ -12,7 +12,11 @@ name: Pages
 on:
   push:
     branches: [main]
-  workflow_dispatch: # so it can be proved on a branch before main depends on it
+  # A pull request builds and assembles but does not deploy. That is what lets a change to
+  # this file be proved before main depends on it -- workflow_dispatch cannot, because
+  # GitHub only knows a workflow once it is on the default branch.
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -65,12 +69,19 @@ jobs:
           cp -r frontend/app/dist/. _site/app/
           test -f _site/app/index.html || { echo "the instrument did not build"; exit 1; }
 
+      - name: What was assembled
+        run: |
+          echo "site is $(du -sh _site | cut -f1) across $(find _site -type f | wc -l) files"
+          find _site -maxdepth 2 -name '*.html' | sed 's|_site|.|' | sort
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
     needs: build
+    # Never from a pull request: the site is published from main and from nowhere else.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
