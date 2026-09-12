@@ -15,10 +15,18 @@ Open it locally and it works with nothing running:
 open docs/presentation/2026-09-09-lecture-performance-deck.html    # or xdg-open / start
 ```
 
-**On the web it needs GitHub Pages.** GitHub serves `.html` in a repository as source, not as a
-page, so the link above renders as markup until Pages is switched on for this repository. With
-Pages serving from `/docs` on `main`, the deck is at
-`https://wwstorymode.github.io/BodyPrompt/presentation/2026-09-09-lecture-performance-deck.html`.
+**On the web, GitHub Pages serves it** — enabled 2026-09-12, from `/docs` on `main`:
+
+> https://wwstorymode.github.io/BodyPrompt/presentation/2026-09-09-lecture-performance-deck.html
+
+Without Pages a `.html` file in a repository renders as source rather than as a page, which is
+the whole reason it is switched on.
+
+`docs/.nojekyll` disables Jekyll, so every file under `docs/` is served exactly as committed.
+That matters here: the deck reaches the browser byte-for-byte as it was presented, with no build
+step able to alter it. The cost is that the markdown files in this directory are served as plain
+text rather than rendered — they are meant to be read on github.com, where the links between
+them work.
 
 The only thing it fetches is two typefaces from Google Fonts. Without a network it falls back to
 Georgia and a monospace face and stays entirely readable.
