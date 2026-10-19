@@ -14,8 +14,36 @@ const STAGE_BG = 0x0b0c10;
 const PERF_BG = 0x07080b; // performance: darker, for a projector in a dark room
 const ACCENT = 0xe9b872; // bone/amber
 const BONE = 0xd8b985;
-const GRID = 0x232732;
+// The floor. NOT the --line hairline token it used to borrow (#232732): that is the colour
+// of a 1px divider between panels, read at desk distance, and it cannot carry a floor seen
+// across a room. Measured against the backgrounds it actually sits on, #232732 reached
+// 1.12:1 on the bench and **1.045:1 in performance** — and only 1.34:1 even at full opacity,
+// so no amount of alpha was going to rescue it. These two sit between --line and --ink-faint
+// on the house ramp, continuing it rather than inventing a colour: 1.94:1 and 1.68:1 for the
+// floor, 3.38:1 and 2.67:1 for the origin. Present, and still subordinate to the body.
+const GRID_LINE = 0x434b5c;
+// The two centre lines, left brighter so the origin is readable. On 20 m of floor that is
+// what lets travel read as distance *from* somewhere rather than as a body adrift on a mesh.
+const GRID_ORIGIN = 0x6b7689;
+// One pair of values, read by both the constructor and setPerformanceMode.
+const GRID_OPACITY = 0.85;
+const GRID_OPACITY_PERF = 0.7; // a projector in a dark room, not a monitor at arm's length
 const GHOST = 0x74a7c8; // cool tint — the variance cloud
+
+// How much floor there is, and how fine it is.
+//
+// Sized from measured travel, not chosen by eye. The grid is centred on the origin, so only
+// half of it lies in whichever direction the body goes: 20 m across is ±10 m of floor.
+// Against that, one line travels 2.11 m on Kimodo and 3.89 m on SnapMoGen, the furthest
+// ghost sibling reaches 4.77 m, and a whole baked poem's net displacement measured 3.63 m
+// (docs/journal/2026-09-08-day-4.md). The worst of those is the sibling, so this is about
+// twice the worst case. It was 6 m until 2026-10-19, which put a SnapMoGen line and every
+// far sibling off the edge — standing on nothing, with no ground left to read travel against.
+//
+// The 0.5 m cell is the part not to trade away: it is what makes the floor legible as
+// *distance* rather than as decoration, so extent grows with the division count.
+const GRID_METRES = 20;
+const GRID_CELLS = 40;
 
 // Trail shape: how many ghost samples, and how many source-frames apart.
 const TRAIL_LEN = 8;
@@ -112,9 +140,10 @@ export class StickFigureRenderer {
 
     // ground grid (the "floor" the figure stands on)
     if (opts.grid !== false) {
-      const grid = new THREE.GridHelper(6, 12, GRID, GRID);
+      // GridHelper(size, divisions, centre-line colour, grid colour)
+      const grid = new THREE.GridHelper(GRID_METRES, GRID_CELLS, GRID_ORIGIN, GRID_LINE);
       (grid.material as THREE.Material).transparent = true;
-      (grid.material as THREE.Material).opacity = 0.5;
+      (grid.material as THREE.Material).opacity = GRID_OPACITY;
       this.scene.add(grid);
       this.grid = grid;
     }
@@ -263,7 +292,7 @@ export class StickFigureRenderer {
     this.scene.background = new THREE.Color(on ? PERF_BG : STAGE_BG);
     if (this.grid) {
       const mat = this.grid.material as THREE.Material;
-      mat.opacity = on ? 0.22 : 0.5;
+      mat.opacity = on ? GRID_OPACITY_PERF : GRID_OPACITY;
     }
   }
 
