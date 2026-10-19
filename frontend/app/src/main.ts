@@ -31,6 +31,7 @@ import type { CanonicalMotion } from "./types";
 import { openAutosave } from "./autosave";
 import { askFor, continuityLabel, readPanel } from "./triptych";
 import { wholePoemAction, wholePoemLabel, wholePoemTitle } from "./whole-poem";
+import { FULL_SPEED, PERFORM_TEMPO, TEMPO_STEPS, stepTempo } from "./tempo";
 import { SessionError, fromSession, restore, sessionFilename, sessionUrl, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -99,6 +100,9 @@ const playPauseEl = $<HTMLButtonElement>("playpause");
 const scrubEl = $<HTMLInputElement>("scrub");
 const counterEl = $<HTMLSpanElement>("counter");
 const ghostsEl = $<HTMLInputElement>("ghosts");
+const followEl = $<HTMLInputElement>("follow");
+const overlayEl = $<HTMLInputElement>("overlay");
+const tempoEl = $<HTMLSelectElement>("tempo");
 const notationSvgEl = document.getElementById("notation-svg") as unknown as SVGSVGElement;
 const floorSvgEl = document.getElementById("floor-svg") as unknown as SVGSVGElement;
 const appEl = $<HTMLDivElement>("app");
@@ -1208,16 +1212,42 @@ function setReading(on: boolean): void {
 // (writing, drafting, baking) while the room sees only the body, the line it is
 // answering, and the score. Slowed down, because a human has to be able to follow it.
 
-const TEMPOS = [0.5, 0.25, 1]; // performance opens at half speed; T cycles
-const FULL_SPEED = TEMPOS.indexOf(1);
 let performing = false;
-// Where T picks up from. The bench plays at full speed, so it starts here and the first
-// press steps to 0.5x; performance mode re-seats it at 0.5x (index 0) when it opens.
-let tempoIdx = FULL_SPEED;
 
 function setTempo(rate: number): void {
   renderer.setTempo(rate);
   perfTempoEl.textContent = `${rate}× tempo`;
+  // The select, the overlay's label and the renderer say the same thing or they are lying
+  // about the speed the room is watching.
+  tempoEl.value = String(rate);
+}
+
+/** `[` and `]` — one speed slower or faster, stopping at the ends. */
+function nudgeTempo(by: -1 | 1): void {
+  setTempo(stepTempo(Number(tempoEl.value), by, false));
+}
+
+/**
+ * Follow the body with the camera, or stop.
+ *
+ * Kept in one place so the checkbox, the key and performance mode cannot disagree about
+ * whether the camera is moving — a control that misreports that is worse than no control.
+ */
+function setFollowing(on: boolean): void {
+  followEl.checked = on;
+  renderer.setFollow(on);
+}
+
+/**
+ * Show or hide the phrase under the body.
+ *
+ * Hiding it leaves the body alone on the stage, which is sometimes what a room wants — and
+ * it is the performer's call, not the instrument's. Press O again to bring it back; the key
+ * is listed in the overlay itself while the overlay is the thing you can see.
+ */
+function setOverlay(on: boolean): void {
+  overlayEl.checked = on;
+  appEl.classList.toggle("overlay-off", !on);
 }
 
 /**
@@ -1342,6 +1372,16 @@ function setPerforming(on: boolean): void {
   // Rating is editorial. The room is here for the body, not for someone's marking.
   if (on && reviewing) setReviewing(false);
   renderer.setPerformanceMode(on);
+  // Entering the room turns the camera follow on and the phrase back up; leaving puts them
+  // back. These are defaults for the mode, not a lock — F and O override either at any
+  // point, the same way T re-seats the speed on entry and you can still change it after.
+  //
+  // The bench defaults to not following because it is for inspection, where travel is easier
+  // to judge against ground that holds still. The triptych never follows at all: equalising
+  // travel across the panels would hide the difference between a model that covers 3.89 m
+  // and one that covers 0.09 m, which is the comparison those panels exist to make.
+  setFollowing(on);
+  if (on) setOverlay(true);
 
   performEl.textContent = on ? "Exit" : "Perform";
   modePillEl.textContent = on ? "Performance" : "Search instrument · live";
@@ -1349,18 +1389,16 @@ function setPerforming(on: boolean): void {
   if (!on) updateScoreHead(); // the title may be naming a line, not the whole poem
 
   if (on) {
-    tempoIdx = 0; // performance opens at half speed — a body has to be able to follow it
-    setTempo(TEMPOS[tempoIdx]);
+    setTempo(PERFORM_TEMPO);
     renderer.play();
   } else {
-    tempoIdx = FULL_SPEED;
-    setTempo(TEMPOS[tempoIdx]);
+    setTempo(FULL_SPEED);
   }
 }
 
+/** `T` — the next speed, wrapping round, so every speed is reachable from one key. */
 function cycleTempo(): void {
-  tempoIdx = (tempoIdx + 1) % TEMPOS.length;
-  setTempo(TEMPOS[tempoIdx]);
+  setTempo(stepTempo(Number(tempoEl.value), 1, true));
 }
 
 /**
@@ -1506,7 +1544,16 @@ renderer.onFrame(({ frame, total, fps, playing, segmentIndex }) => {
     if (scoreScope === "line") buildScore();
     const line = playingLines[segmentIndex];
     // The room reads the sentence the body is answering right now, not the whole poem.
-    if (line) perfPhraseEl.textContent = `“${line.text}”`;
+    if (line) {
+      perfPhraseEl.textContent = `“${line.text}”`;
+      // A long line is capped at 30vh so it cannot cover the body. Say when that happened:
+      // a phrase cut to a clean edge reads as a finished sentence, which misrepresents what
+      // the body is answering. Measured here, once per line boundary rather than per frame.
+      perfPhraseEl.classList.toggle(
+        "clipped",
+        perfPhraseEl.scrollHeight > perfPhraseEl.clientHeight + 1,
+      );
+    }
     for (const [id, row] of rows) row.classList.toggle("playing", id === line?.id);
   }
 });
@@ -1816,6 +1863,9 @@ function transportLead(): StickFigureRenderer {
 
 playPauseEl.addEventListener("click", () => setPlayingAll(!transportLead().playing));
 ghostsEl.addEventListener("change", () => renderer.setGhostsVisible(ghostsEl.checked));
+followEl.addEventListener("change", () => setFollowing(followEl.checked));
+overlayEl.addEventListener("change", () => setOverlay(overlayEl.checked));
+tempoEl.addEventListener("change", () => setTempo(Number(tempoEl.value)));
 
 scrubEl.addEventListener("input", () => {
   userScrubbing = true;
@@ -1872,6 +1922,18 @@ window.addEventListener("keydown", (e) => {
       break;
     case "t":
       cycleTempo();
+      break;
+    case "[":
+      nudgeTempo(-1); // slower
+      break;
+    case "]":
+      nudgeTempo(1); // faster
+      break;
+    case "f":
+      setFollowing(!followEl.checked);
+      break;
+    case "o":
+      setOverlay(!overlayEl.checked);
       break;
     case "g":
       ghostsEl.checked = !ghostsEl.checked;
@@ -2030,3 +2092,12 @@ const boot = new URLSearchParams(location.search);
 if (boot.has("perform")) setPerforming(true);
 if (boot.has("compare")) setComparing(true);
 if (boot.has("registers")) setReading(true);
+// Read after the mode flags, so an explicit choice beats the mode's default. `?speed=` takes
+// any rate the control offers; anything else is ignored rather than guessed at.
+if (boot.has("follow")) setFollowing(boot.get("follow") !== "0");
+if (boot.has("phrase")) setOverlay(boot.get("phrase") !== "0");
+if (boot.has("speed")) {
+  const rate = Number(boot.get("speed"));
+  if (TEMPO_STEPS.includes(rate)) setTempo(rate);
+}
+

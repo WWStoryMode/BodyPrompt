@@ -153,7 +153,7 @@ continuity in the system to make the columns match — **the asymmetry *is* the 
 ![Performance mode — the chrome falls away, the phrase goes large](docs/screenshots/performance-mode.png)
 
 Press <kbd>P</kbd> and the instrument becomes a stage: the chrome falls away, the phrase the
-body is answering goes large, playback slows to half speed to be followed by a body — but
+body is answering goes large, the speed is yours to set so a body can follow it — but
 the **poem keeps growing**, and you can still write and generate live, in front of the room.
 
 The audience does not just watch generated movement — they watch the **evolution of

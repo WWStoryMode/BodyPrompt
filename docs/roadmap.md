@@ -56,14 +56,28 @@ quietly half-built.
   the body: the spotlight is a radial gradient pinned to the centre of the viewport, so a body
   at 3.9 m stands outside its own light.
 
-  A camera that followed the pelvis would fix that **without touching the data**, which is a
-  different thing from pelvis-aligning the motion and does not reopen the decision above. But
-  with the ghost-cloud on it cannot be done innocently: following the selected line's body
-  drifts the far siblings out of frame, and the far siblings are where that ~75% lives.
-  Following the centroid centres nobody. So **what a follow camera should follow is a research
-  decision rather than a UI default**, and it waits on seeing the extended floor from the back
-  of a room — the judgement Track 3 of [`v4-proposal.md`](v4-proposal.md) says should not be
-  made at a desk.
+  **The camera now follows the body in performance mode, and only there.** It eases after the
+  pelvis in x and z, panning the camera and its orbit target together so the viewer's angle and
+  distance survive, and it moves **the viewpoint and never the motion** — a different thing
+  from pelvis-aligning, which does not reopen the decision above. Measured on a body covering
+  SnapMoGen's 3.89 m: on screen for 55% of the phrase before, 100% after, trailing the pelvis
+  by at most 0.27 m. The bench keeps a fixed world frame, because travel is easier to judge
+  against ground that holds still, and the triptych never gets it at all — equalising travel
+  across the panels would hide the difference between a model that covers 3.89 m and one that
+  covers 0.09 m, which is the comparison those panels exist to make.
+
+  **Two things it does not settle.**
+
+  *What to follow when the ghost-cloud is on.* It follows the selected body; the siblings stay
+  where the model put them, so the far ones leave the frame — and the far ones are where that
+  ~75% lives. Following the centroid centres nobody. This stays a research decision rather
+  than a UI default, to be made from the back of a room and not at a desk, which is what
+  Track 3 of [`v4-proposal.md`](v4-proposal.md) asks for.
+
+  *The spotlight still does not travel.* It is a radial gradient pinned to the centre of the
+  viewport, so following the body happens to fix the symptom — the body is centred again, and
+  therefore lit — without fixing the cause. A body deliberately left off-centre, or a second
+  figure, would still be outside the light.
 
 **From v2 — the poem's unfinished edges:**
 
