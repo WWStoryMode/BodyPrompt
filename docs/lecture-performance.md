@@ -38,12 +38,17 @@ software does is in service of making those two moments possible.
 ![Performance mode — the instrument chrome falls away, the phrase goes large](screenshots/performance-mode.png)
 
 Hit **Perform** (or press <kbd>P</kbd>) for the projectable stage: the instrument chrome
-falls away, the phrase goes large, playback slows to half speed to be followed by a body —
+falls away, the phrase goes large, the speed is yours to set so a body can follow it —
 but the **poem keeps growing** and you can still write and generate live, in front of the
 room.
 
 - The background drops to near-black, chosen for a projector in a dark room.
-- Playback re-seats to **0.5× tempo**, because a body has to be able to follow it.
+- Playback opens at **real time**, and every speed down to 0.1× is a keypress away
+  (<kbd>T</kbd>, or <kbd>[</kbd> <kbd>]</kbd>). A body has to be able to follow and re-embody
+  what it sees — but how slow that needs to be is the performer's judgement, not a default.
+- **The camera follows the body**, easing after the pelvis so a line that travels several
+  metres stays on screen and inside the spotlight. It moves the viewpoint, never the motion —
+  the travel is still there, still on the floor and still in the floor-path register.
 - The phrase the body is answering right now is set large and centred; the lines still
   waiting stay in the poem on the left.
 - <http://localhost:5173/?perform=1> boots straight into it, for plugging into a projector.
@@ -53,7 +58,10 @@ room.
 |---|---|
 | <kbd>P</kbd> | enter / leave performance mode |
 | <kbd>space</kbd> | play / pause |
-| <kbd>T</kbd> | cycle tempo (0.5× → 0.25× → 1×) |
+| <kbd>T</kbd> | cycle the speed, wrapping round every value |
+| <kbd>[</kbd> <kbd>]</kbd> | step the speed slower / faster |
+| <kbd>F</kbd> | camera follow on / off |
+| <kbd>O</kbd> | the phrase shown / hidden |
 | <kbd>R</kbd> | read the four notation registers |
 | <kbd>C</kbd> | compare models (the triptych) |
 | <kbd>N</kbd> | one line / the whole poem |

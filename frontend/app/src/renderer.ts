@@ -8,6 +8,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { CanonicalMotion } from "./types";
 import { buildTimeline, entryAt, type TimelineEntry } from "./timeline";
 import { JOINT_INDEX, LANDMARK_JOINTS, TRAIL_JOINTS } from "./skeleton";
+import { FOLLOW_HEIGHT, followPan } from "./follow";
 
 // House palette (matches frontend/mockups/styles.css).
 const STAGE_BG = 0x0b0c10;
@@ -114,6 +115,8 @@ export class StickFigureRenderer {
 
   // the stage itself: a lab bench is lit for inspection, a performance is lit for a room
   private grid?: THREE.GridHelper;
+  /** Whether the camera tracks the body. Off on the bench, on for the room. */
+  private following = false;
 
   constructor(container: HTMLElement, opts: RendererOptions = {}) {
     this.container = container;
@@ -134,7 +137,7 @@ export class StickFigureRenderer {
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.set(0, 1.0, 0); // chest height — the body, not the floor
+    this.controls.target.set(0, FOLLOW_HEIGHT, 0); // chest height — the body, not the floor
     this.controls.enableDamping = true;
     this.controls.update();
 
@@ -284,9 +287,74 @@ export class StickFigureRenderer {
   }
 
   /**
-   * Light the stage for a room rather than for inspection: a darker ground, a dimmer
-   * grid. The figure stays exactly as it is — this is the *only* honest thing to change,
-   * since the notation is the work.
+   * Follow the body, or stop following it.
+   *
+   * Separate from `setPerformanceMode` because it is a different kind of change: the palette
+   * is about the room's light, this is about where the camera is pointed. Keeping them apart
+   * also leaves the bench able to opt in later without inheriting a dark background.
+   *
+   * While following, the camera owns the orbit target: dragging to orbit still works, because
+   * the follow pans the camera and its target together and so preserves the angle and
+   * distance, but right-drag panning is overridden every frame. That is the trade — the
+   * instrument can keep a travelling body on screen, or it can let you put the target
+   * anywhere, and in front of a room the first one matters more.
+   *
+   * Switching off snaps the target home rather than easing back. It happens at the moment
+   * performance mode is left, when the chrome returns and the tempo changes anyway, and an
+   * ease would fight the first manual pan for as long as it ran.
+   */
+  setFollow(on: boolean): void {
+    if (this.following === on) return;
+    this.following = on;
+    if (!on) {
+      const home = new THREE.Vector3(0, FOLLOW_HEIGHT, 0);
+      // The camera moves by the same delta as the target, which is what makes it a pan and
+      // leaves the viewer's angle and distance exactly as they left them.
+      this.camera.position.add(home.clone().sub(this.controls.target));
+      this.controls.target.copy(home);
+      this.controls.update();
+    }
+  }
+
+  /**
+   * Ease the shot toward the body. Called every frame, playing or not.
+   *
+   * The pelvis is read from the playhead rather than from whatever `applyFrame` last wrote,
+   * because `applyFrame` is also reached from `seek`, `seekSegment` and `loadSequence`,
+   * outside the animation loop — reading the frame here is what makes those cases work
+   * without four places having to remember the camera.
+   *
+   * It follows the primary body only. With the ghost-cloud on, the siblings travel 2.31-4.77 m
+   * and stay where the model put them, so the far ones will leave the frame — and roughly
+   * three quarters of the spread between siblings *is* that travel. What a camera should do
+   * about that is a research decision and is recorded as open in docs/roadmap.md; it is not
+   * guessed at here.
+   */
+  private updateFollow(dt: number): void {
+    if (!this.following || !this.motion) return;
+    const pose = this.poseAt(Math.round(this.frameFloat));
+    const pelvis = pose?.[JOINT_INDEX["pelvis"]];
+    if (!pelvis) return;
+
+    const { dx, dz } = followPan(
+      { x: this.controls.target.x, z: this.controls.target.z },
+      { x: pelvis[0], z: pelvis[2] },
+      dt,
+    );
+    if (dx === 0 && dz === 0) return;
+
+    this.controls.target.x += dx;
+    this.controls.target.z += dz;
+    this.camera.position.x += dx;
+    this.camera.position.z += dz;
+  }
+
+  /**
+   * Light the stage for a room rather than for inspection: a darker ground, a dimmer grid.
+   *
+   * The figure itself stays exactly as it is — the notation is the work, so nothing here
+   * touches the body. The camera is the one other thing the room needs and it has its own
+   * switch, `setFollow`, rather than being folded in here.
    */
   setPerformanceMode(on: boolean): void {
     this.scene.background = new THREE.Color(on ? PERF_BG : STAGE_BG);
@@ -507,6 +575,10 @@ export class StickFigureRenderer {
       this.emit();
     }
 
+    // Outside the block above on purpose: a paused stage still gets scrubbed, and the
+    // camera has to come with the playhead. Before `controls.update()`, so the damping
+    // this frame consumes the new target rather than lagging a frame behind it.
+    this.updateFollow(dt);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   };

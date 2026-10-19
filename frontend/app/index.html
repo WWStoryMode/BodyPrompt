@@ -127,9 +127,9 @@
             <div id="perf-phrase" class="perf-phrase"></div>
             <div class="perf-meta">
               <span>⟳ loop</span>
-              <span id="perf-tempo" class="on">0.5× tempo</span>
+              <span id="perf-tempo" class="on">1× tempo</span>
               <span>re-embody</span>
-              <span class="perf-keys">space play · T tempo · esc exit</span>
+              <span class="perf-keys">space play · T / [ ] speed · F follow · O phrase · esc exit</span>
             </div>
           </div>
 
@@ -293,10 +293,35 @@
       <div class="transport">
         <button id="playpause">Play</button>
         <input id="scrub" class="scrub" type="range" min="0" max="1000" value="0" />
+        <!-- Playback speed. A body has to be able to follow and re-embody what it sees,
+             and how slow that needs to be is a studio judgement, not a constant. -->
+        <label class="duration">
+          <span>speed</span>
+          <select id="tempo" class="model-select">
+            <option value="0.1">0.1×</option>
+            <option value="0.25">0.25×</option>
+            <option value="0.5">0.5×</option>
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
         <!-- the variance cloud: one prompt, many seeds -->
         <label class="toggle">
           <input id="ghosts" type="checkbox" checked />
           <span>ghost-cloud</span>
+        </label>
+        <!-- The camera tracks the body, so a line that travels stays in the shot. Off here
+             by default: the bench is for inspection, where still ground reads better. -->
+        <label class="toggle">
+          <input id="follow" type="checkbox" />
+          <span>follow</span>
+        </label>
+        <!-- The phrase the room is reading, large beneath the body. -->
+        <label class="toggle">
+          <input id="overlay" type="checkbox" checked />
+          <span>phrase</span>
         </label>
         <span id="counter" class="counter">— / —</span>
       </div>

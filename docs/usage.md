@@ -53,8 +53,11 @@ hunting for a mouse in front of an audience.
 | <kbd>C</kbd> | **Compare** — open / close the multi-model triptych |
 | <kbd>P</kbd> | **Perform** — enter / leave performance mode |
 | <kbd>space</kbd> | play / pause |
-| <kbd>T</kbd> | cycle tempo: 0.5× → 0.25× → 1× |
+| <kbd>T</kbd> | cycle the speed, wrapping round: 0.1 · 0.25 · 0.5 · 0.75 · 1 · 1.5 · 2 |
+| <kbd>[</kbd> <kbd>]</kbd> | step the speed slower / faster through every value the control offers |
 | <kbd>G</kbd> | ghost-cloud on / off |
+| <kbd>F</kbd> | **follow** — the camera tracks the body, or stops |
+| <kbd>O</kbd> | the phrase under the body, shown or hidden |
 | <kbd>esc</kbd> | leave the current mode; from a line, unfocus it |
 
 **In the poem:** <kbd>enter</kbd> starts a new line, <kbd>backspace</kbd> at the start of a
@@ -85,6 +88,13 @@ clicking through chrome in front of a room.
 | `localhost:5173/?registers=1` | straight into the four notation registers |
 | `localhost:5173/?compare=1` | straight into the triptych |
 | `localhost:5173/?perform=1` | straight into the projectable performance stage |
+| `…/?follow=1` · `?follow=0` | camera follow on or off, whatever the mode would have chosen |
+| `…/?phrase=0` | boot with the phrase hidden — the body alone on the stage |
+| `…/?speed=0.25` | any speed the control offers: 0.1, 0.25, 0.5, 0.75, 1, 1.5, 2 |
+
+The three above are read **after** the mode flags, so an explicit choice beats the mode's
+default — `?perform=1&follow=0` opens the stage with a still camera. A `?speed=` that is not
+one of the offered values is ignored rather than guessed at.
 
 ---
 
@@ -105,8 +115,11 @@ Around the stage:
 - **Poem rail** (left) — the score you are writing. See below.
 - **Notation rail** (right) — two of the four registers, small: the notation strip and the
   floor path. <kbd>R</kbd> opens all four, large.
-- **Transport** (bottom) — play/pause, a scrub bar, the ghost-cloud toggle, and a frame
-  counter. Scrubbing moves the figure, the ghosts, and every open register together.
+- **Transport** (bottom) — play/pause, a scrub bar, a **speed** control, the ghost-cloud
+  toggle, a **follow** toggle, a **phrase** toggle, and a frame counter. Scrubbing moves the
+  figure, the ghosts, and every open register together. The controls themselves are stripped
+  in performance mode, where the keys do the same jobs — you do not want to be hunting for a
+  mouse in front of a room.
 
 ### The poem — the core contribution
 
@@ -408,10 +421,34 @@ the same poem.** The performer keeps working — writing, drafting, baking — w
 room sees only the body, the phrase and the score.
 
 What changes: the instrument chrome falls away, the background darkens, a spotlight gathers the
-eye onto the body, the phrase goes large beneath it, and **playback drops to half speed** —
-because a human has to be able to *follow and re-embody it*. The score gets thicker strokes and
+eye onto the body, and the phrase goes large beneath it — capped at a third of the window, so
+a long line cannot cover the body it describes. The score gets thicker strokes and
 bigger labels: it has to be readable by a body, from across a room. The poem keeps growing in
 the corner — research log as set.
+
+**And the camera follows the body.** A line can travel several metres — 3.89 m on SnapMoGen —
+and the stage was framed on a body at the origin, so a travelling body used to leave the shot
+for nearly half the phrase and walk out of its own spotlight. The camera now eases after the
+pelvis, trailing it by about a quarter of a metre so it reads as an operator following a dancer
+rather than the body being pinned to the glass.
+
+**It moves the viewpoint and not the motion.** How far a body goes is part of how the model read
+the prompt, so nothing is subtracted: the floor still streams past underneath, and the floor-path
+register still shows the whole trace. Dragging to orbit works exactly as before — the camera and
+its target move together, so your angle and distance are kept — but **right-drag panning is
+overridden while performing**, because the camera is busy keeping the body on screen. Leaving
+performance mode puts the camera back on the origin.
+
+**All three are switchable from the stage**, because what a room needs is a judgement made in
+the room: <kbd>F</kbd> stops the camera following, <kbd>O</kbd> takes the phrase away and leaves
+the body alone, and <kbd>T</kbd> or <kbd>[</kbd> <kbd>]</kbd> change the speed. Performance
+opens at **real time**, so the first thing the room sees is the motion as the model made it —
+and every speed down to 0.1× is one keypress away when a body needs to follow it.
+
+With the **ghost-cloud** on, the camera follows the selected body only. The siblings stay where
+the model put them and the far ones can leave the frame — and most of the spread between
+siblings *is* how far each one travelled. What a camera should do about that is an open
+question, not a settled default; see [`roadmap.md`](roadmap.md).
 
 <kbd>T</kbd> cycles the tempo, <kbd>space</kbd> plays and pauses, <kbd>esc</kbd> gets you out.
 `?perform=1` boots straight into it, for plugging into a projector.
