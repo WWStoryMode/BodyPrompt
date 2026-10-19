@@ -16,6 +16,7 @@ import {
   Poem,
   RATING_ANCHORS,
   suggestedDuration,
+  type LineState,
   type PoemLine,
   type RatingValue,
 } from "./poem";
@@ -29,6 +30,7 @@ import type { RegisterView } from "./notation";
 import type { CanonicalMotion } from "./types";
 import { openAutosave } from "./autosave";
 import { askFor, continuityLabel, readPanel } from "./triptych";
+import { wholePoemAction, wholePoemLabel, wholePoemTitle } from "./whole-poem";
 import { SessionError, fromSession, restore, sessionFilename, sessionUrl, toSession } from "./session";
 
 // Where the FastAPI service listens. Keep in sync with service/ CORS + --port.
@@ -1044,10 +1046,13 @@ function setBarLabels(): void {
   generateEl.title = comparing
     ? "Ask all three models (D)"
     : "Generate the selected line alone (D)";
-  bakeEl.textContent = comparing ? "Whole poem" : "Bake";
+  // Only one model can answer a whole poem as one motion, so the bench button names the
+  // action it is actually about to take rather than the one the key is called after.
+  const action = wholePoemAction(capabilities.get(modelEl.value));
+  bakeEl.textContent = comparing ? "Whole poem" : wholePoemLabel(action);
   bakeEl.title = comparing
     ? "Ask all three models the whole poem (B)"
-    : "Generate the whole poem continuously (B)";
+    : wholePoemTitle(action);
 }
 
 function triptychPill(): string {
@@ -1533,6 +1538,23 @@ function generationFailed(err: unknown, keeping: string): void {
   generationStatusEl.className = "generation-status error";
 }
 
+/**
+ * Hand the buttons back, and say how it went.
+ *
+ * `setGenerating` owns the status line and clears it, so the outcome has to be written
+ * *after* the buttons come back rather than before — otherwise re-enabling them wipes what
+ * just happened, and the elapsed time is never seen. That ordering is easy to get wrong
+ * twice, so it lives in one function instead of in three that have to agree.
+ */
+function generationSettled(failure: unknown, started: number, keeping: string): void {
+  setGenerating(false);
+  if (failure) {
+    generationFailed(failure, keeping);
+    return;
+  }
+  generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
+}
+
 async function post(body: unknown): Promise<CanonicalMotion> {
   // Every route to the service comes through here — drafting, baking, the triptych. A
   // published build refuses before the fetch rather than after it: reaching localhost from a
@@ -1566,9 +1588,13 @@ async function draftLine(id: number | null = poem.selectedId): Promise<void> {
   const line = id === null ? undefined : poem.get(id);
   if (!line || !line.text.trim()) return;
   const started = performance.now();
+  // What to put the row back to if the request never arrives. `markGenerating` overwrites
+  // it, and nothing else can work it out afterwards.
+  const was: LineState = line.state;
   poem.markGenerating(line.id);
   renderPoem();
   setGenerating(true, "drafting…");
+  let failure: unknown = null;
   try {
     const motion = await post({
       model: modelEl.value,
@@ -1580,25 +1606,88 @@ async function draftLine(id: number | null = poem.selectedId): Promise<void> {
     });
     poem.recordDraft(line.id, motion);
     showCurrent();
-    generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
   } catch (err) {
-    poem.setText(line.id, line.text); // knocks it out of "generating"
-    generationFailed(err, "The line is unchanged.");
+    failure = err;
+    poem.cancelGenerating(line.id, was);
   } finally {
     renderPoem();
-    setGenerating(false);
+    generationSettled(failure, started, "The line is unchanged.");
+  }
+}
+
+/**
+ * Generate every line on a model that cannot stitch a poem.
+ *
+ * Each line is generated alone — the same request `D` sends — and lands as that line's own
+ * draft. **No bake is recorded**, deliberately: `poem.baked` stays null, `bakeIsCurrent`
+ * keeps reporting false, and the banner keeps saying there is no continuous reading. These
+ * lines were never carried into one another, and writing them into the bake would put that
+ * claim into every session file the poem is exported to, where it would be read by people
+ * who were not here to watch the body jump between them.
+ *
+ * Sequential, for two reasons: the service gates a local worker to one generation at a time
+ * anyway, so firing them together buys nothing; and a failure part way through then leaves
+ * every line drafted before it untouched rather than abandoning a half-made batch.
+ */
+async function draftAllLines(): Promise<void> {
+  const lines = poem.written;
+  if (!lines.length) return;
+  const started = performance.now();
+  let done = 0;
+  let failure: unknown = null;
+  try {
+    for (const line of lines) {
+      setGenerating(true, `drafting line ${done + 1} of ${lines.length}…`);
+      const motion = await post({
+        model: modelEl.value,
+        prompt: line.text.trim(),
+        // The ghost-cloud is a per-line instrument, and four readings of every line of a
+        // poem is minutes of generation. Drafting the whole poem never asks for one.
+        variants: 1,
+        duration_seconds: poem.durationOf(line),
+        denoising_steps: chosenSteps(),
+      });
+      poem.recordDraft(line.id, motion);
+      done += 1;
+      // The rows are cheap to redraw and show each line turning into a draft as it lands.
+      // The stage is not: `showCurrent` lays every drafted motion end to end, so doing it
+      // per line would be quadratic in the length of the poem — and a rating corpus can be
+      // hundreds of lines. It is laid out once, after the last line arrives.
+      renderPoem();
+    }
+  } catch (err) {
+    failure = err;
+  } finally {
+    showCurrent();
+    renderPoem();
+    generationSettled(
+      failure,
+      started,
+      done
+        ? `${done} of ${lines.length} lines were drafted, and are kept.`
+        : "The poem is unchanged.",
+    );
   }
 }
 
 /**
  * Bake the whole poem: every line in one pass, each conditioned on the body the line
  * before it left behind. This is the real reading.
+ *
+ * Only a model that says it can carry one line into the next is asked for this. For the
+ * others `B` still means "the whole poem", but the whole poem is a batch of drafts — see
+ * `draftAllLines`, and `whole-poem.ts` for why the two must not share a name.
  */
 async function bake(): Promise<void> {
+  if (wholePoemAction(capabilities.get(modelEl.value)) === "draft-all") {
+    await draftAllLines();
+    return;
+  }
   const lines = poem.toLines();
   if (!lines.length) return;
   const started = performance.now();
   setGenerating(true, `baking ${lines.length} lines…`);
+  let failure: unknown = null;
   try {
     const motion = await post({
       model: modelEl.value,
@@ -1609,12 +1698,11 @@ async function bake(): Promise<void> {
     loopingLineId = null;
     renderer.setLoop("whole");
     showCurrent();
-    generationStatusEl.textContent = `${((performance.now() - started) / 1000).toFixed(1)} s`;
   } catch (err) {
-    generationFailed(err, "The previous reading is still on the stage.");
+    failure = err;
   } finally {
     renderPoem();
-    setGenerating(false);
+    generationSettled(failure, started, "The previous reading is still on the stage.");
   }
 }
 
@@ -1698,6 +1786,9 @@ function bakeHere(): void {
 
 generateEl.addEventListener("click", draftHere);
 bakeEl.addEventListener("click", bakeHere);
+// Which whole-poem action is available is a fact about the selected model, so the button
+// has to be renamed when the selection changes and not only when a view opens.
+modelEl.addEventListener("change", setBarLabels);
 triptychEl.addEventListener("click", () => setComparing(!comparing));
 registersBtnEl.addEventListener("click", () => setReading(!reading));
 
@@ -1914,6 +2005,8 @@ async function start(): Promise<void> {
   }
 
   const serviceUp = serviceExpected() ? await refreshCapabilities() : false;
+  // Now that the capabilities are known, the whole-poem button can name what it will do.
+  setBarLabels();
   if (restored) {
     showCurrent();
   } else if (serviceUp && anyModelReady()) {

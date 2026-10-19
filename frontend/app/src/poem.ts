@@ -373,6 +373,25 @@ export class Poem {
   }
 
   /**
+   * Abandon a generation that never arrived.
+   *
+   * `generating` describes a request **in flight**. When one fails nothing is in flight any
+   * more, and a row that goes on spinning is a lie told by a dot — the same reason a restore
+   * refuses to bring that state back (see `docs/session-schema.md`).
+   *
+   * Nothing about the line itself changed, so it returns to exactly what it was: a line that
+   * already had a valid draft still has one, and a baked line is still baked. `generating` is
+   * refused as a destination, falling back to what the line's own motion can support — and
+   * never to `draft`, because the take that would justify that word is the one that did not
+   * arrive.
+   */
+  cancelGenerating(id: number, was: LineState): void {
+    const line = this.get(id);
+    if (!line || line.state !== "generating") return;
+    line.state = was !== "generating" ? was : line.motion ? "stale" : "empty";
+  }
+
+  /**
    * Record a line's own motion. Only ever makes that one line valid.
    *
    * The rating travels with the motion it judged. A judgement was made about a particular

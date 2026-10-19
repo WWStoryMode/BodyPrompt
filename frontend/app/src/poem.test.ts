@@ -355,3 +355,58 @@ test("drafted clips lay end to end, each starting at its own frame zero", () => 
   assert.equal(entryAt(timeline, 74)?.index, 1);
   assert.equal(entryAt(timeline, 75)?.index, 2);
 });
+
+test("a generation that fails never leaves the line spinning", () => {
+  // `generating` describes a request in flight. A row that goes on spinning after the
+  // request died is a lie told by a dot, and it is also unrecoverable on screen: nothing
+  // else in the state machine clears that state.
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  const was = poem.all[0].state;
+  poem.markGenerating(id);
+  assert.equal(poem.all[0].state, "generating");
+
+  poem.cancelGenerating(id, was);
+  assert.equal(poem.all[0].state, "empty");
+});
+
+test("a line that already had a draft keeps it when the next one fails", () => {
+  // Nothing about the line changed, so it goes back to exactly what it was. Marking it
+  // `stale` would claim the take it already has had been invalidated, which it has not.
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  poem.recordDraft(id, motion(30));
+  assert.equal(poem.all[0].state, "draft");
+
+  const was = poem.all[0].state;
+  poem.markGenerating(id);
+  poem.cancelGenerating(id, was);
+
+  assert.equal(poem.all[0].state, "draft");
+  assert.equal(poem.all[0].motion?.frames.length, 30);
+  assert.equal(poem.all[0].history.length, 0); // the take that never arrived made no history
+});
+
+test("cancelling touches nothing that is not generating", () => {
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  poem.recordDraft(id, motion(30));
+
+  poem.cancelGenerating(id, "empty"); // not in flight — must be a no-op
+  assert.equal(poem.all[0].state, "draft");
+});
+
+test("cancelling never restores 'generating', whatever it is handed", () => {
+  // The caller passes back what it replaced. If that were itself `generating` — a second
+  // request on a row already spinning — honouring it would re-arm the lie.
+  const poem = new Poem(["first"]);
+  const id = poem.all[0].id;
+  poem.markGenerating(id);
+  poem.cancelGenerating(id, "generating");
+  assert.equal(poem.all[0].state, "empty");
+
+  poem.recordDraft(id, motion(30));
+  poem.markGenerating(id);
+  poem.cancelGenerating(id, "generating");
+  assert.equal(poem.all[0].state, "stale"); // it has a motion, so it is stale, never 'draft'
+});
