@@ -230,6 +230,10 @@ export class StickFigureRenderer {
         }),
       );
       lines.visible = this.ghostsVisible;
+      // Same stale-bounds problem as the primary figure's bones, and each sibling has its
+      // own, so they could blink out one at a time — exactly where travel is the thing
+      // being read, since most of the spread between siblings IS how far each one goes.
+      lines.frustumCulled = false;
       this.scene.add(lines);
       this.ghosts.push({ motion, lines, attr });
     }
@@ -359,6 +363,23 @@ export class StickFigureRenderer {
       boneGeo,
       new THREE.LineBasicMaterial({ color: this.boneColor }),
     );
+    // Never frustum-culled, because its bounds are a lie.
+    //
+    // This geometry's vertices are rewritten every frame in place (applyFrame) and only the
+    // GPU upload is invalidated — `needsUpdate` does not touch the bounding sphere. three
+    // computes that sphere once, lazily, on its first cull test, and at that moment the
+    // buffer is still zero-filled: it caches centre (0,0,0) radius 0, a point at the world
+    // origin, and keeps it forever. The renderer then asks "is the origin in view?" and
+    // throws the whole figure's bones away whenever the answer is no — which is why the
+    // bones vanished at some camera angles while the joints, each its own Mesh with its own
+    // moving transform, stayed. It needs the body away from the origin to show, so fixtures
+    // (0.46 m at most) hid it and real models (2-4 m) do not.
+    //
+    // Recomputing the sphere would also work, but it would have to be remembered at every
+    // site that writes positions — applyFrame is reached from seek, seekSegment and
+    // loadSequence as well — and forgetting one is how this arose. There are at most five
+    // line objects on the stage, so culling them buys nothing worth that risk.
+    this.boneLines.frustumCulled = false;
     this.scene.add(this.boneLines);
 
     // trails — a small stack of fading ghost spheres per tracked joint
