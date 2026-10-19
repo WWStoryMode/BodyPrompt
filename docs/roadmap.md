@@ -49,6 +49,22 @@ quietly half-built.
   optional view, so the ~0.15 m of genuine articulation difference can be examined on its own
   when that is the question being asked. An option, never the default.
 
+  **A follow camera asks the same question from the other side (2026-10-19.)** The ground grid
+  was 6 m across — so a body travelling 3.89 m left the floor entirely, with no ground left to
+  read its travel against. It is 20 m now, sized at roughly twice the furthest measured
+  sibling. What that change exposes is that nothing else in the performance view travels with
+  the body: the spotlight is a radial gradient pinned to the centre of the viewport, so a body
+  at 3.9 m stands outside its own light.
+
+  A camera that followed the pelvis would fix that **without touching the data**, which is a
+  different thing from pelvis-aligning the motion and does not reopen the decision above. But
+  with the ghost-cloud on it cannot be done innocently: following the selected line's body
+  drifts the far siblings out of frame, and the far siblings are where that ~75% lives.
+  Following the centroid centres nobody. So **what a follow camera should follow is a research
+  decision rather than a UI default**, and it waits on seeing the extended floor from the back
+  of a room — the judgement Track 3 of [`v4-proposal.md`](v4-proposal.md) says should not be
+  made at a desk.
+
 **From v2 — the poem's unfinished edges:**
 
 - ~~**Persistence.**~~ **Answered in v3 (2026-08-24.)** The question was never "add saving",
